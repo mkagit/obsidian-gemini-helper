@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   release:
@@ -43,14 +44,14 @@ jobs:
 
       - name: Build
         if: steps.check_tag.outputs.exists == 'false'
-        run: npm run build
+        run: npm run build:langfuse
 
       - name: Create Release
         if: steps.check_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          draft: true
+          draft: false
           files: |
             main.js
             manifest.json

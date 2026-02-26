@@ -19,6 +19,7 @@ main.css
 # obsidian
 data.json
 .hotreload
+.automation/
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

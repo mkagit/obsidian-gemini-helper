@@ -1,0 +1,62 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Resolve parent repository
+        id: parent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          parent="$(gh api repos/${{ github.repository }} --jq '.parent.full_name // empty')"
+          branch="$(gh api repos/${{ github.repository }} --jq '.parent.default_branch // empty')"
+
+          if [ -z "$parent" ] || [ -z "$branch" ]; then
+            echo "is_fork=false" >> "$GITHUB_OUTPUT"
+            echo "Repository is not a fork. Skipping upstream sync."
+            exit 0
+          fi
+
+          echo "is_fork=true" >> "$GITHUB_OUTPUT"
+          echo "parent=$parent" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Syncing from $parent ($branch)"
+
+          fork_sha="$(gh api repos/${{ github.repository }}/commits/$branch --jq '.sha')"
+          upstream_sha="$(gh api repos/$parent/commits/$branch --jq '.sha')"
+
+          if [ "$fork_sha" = "$upstream_sha" ]; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+            echo "Fork is already up to date."
+          else
+            echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+            echo "Fork is behind upstream. Sync required."
+          fi
+
+      - name: Sync from upstream
+        if: steps.parent.outputs.is_fork == 'true' && steps.parent.outputs.needs_sync == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh repo sync ${{ github.repository }} -b ${{ steps.parent.outputs.branch }} --force
+
+      - name: Trigger release workflow
+        if: steps.parent.outputs.is_fork == 'true' && steps.parent.outputs.needs_sync == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release.yml --repo ${{ github.repository }} --ref ${{ steps.parent.outputs.branch }}
