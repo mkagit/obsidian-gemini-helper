@@ -36,18 +36,22 @@ jobs:
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "Syncing from $parent ($branch)"
 
-          fork_sha="$(gh api repos/${{ github.repository }}/commits/$branch --jq '.sha')"
-          upstream_sha="$(gh api repos/$parent/commits/$branch --jq '.sha')"
+          compare_json="$(gh api repos/$parent/compare/$branch...${{ github.repository_owner }}:$branch)"
+          behind_by="$(echo "$compare_json" | jq -r '.behind_by')"
+          ahead_by="$(echo "$compare_json" | jq -r '.ahead_by')"
+          status="$(echo "$compare_json" | jq -r '.status')"
 
-          if [ "$fork_sha" = "$upstream_sha" ]; then
+          echo "Compare status: $status (ahead=$ahead_by, behind=$behind_by)"
+
+          if [ "$behind_by" -eq 0 ]; then
             echo "needs_sync=false" >> "$GITHUB_OUTPUT"
-            echo "Fork is already up to date."
+            echo "Fork is not behind upstream. No sync needed."
           else
             echo "needs_sync=true" >> "$GITHUB_OUTPUT"
             echo "Fork is behind upstream. Sync required."
           fi
 
-      - name: Sync from upstream
+      - name: Checkout fork branch
         if: steps.parent.outputs.is_fork == 'true' && steps.parent.outputs.needs_sync == 'true'
         uses: actions/checkout@v4
         with:
@@ -64,7 +68,7 @@ jobs:
           git fetch upstream ${{ steps.parent.outputs.branch }}
 
           git checkout ${{ steps.parent.outputs.branch }}
-          git merge --no-edit upstream/${{ steps.parent.outputs.branch }}
+          git merge --no-edit -X theirs upstream/${{ steps.parent.outputs.branch }}
           git push origin ${{ steps.parent.outputs.branch }}
 
       - name: Trigger release workflow
