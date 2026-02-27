@@ -27,11 +27,11 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "gemini-2.5-flash-lite":  { input: 0.10 / 1e6, output: 0.40 / 1e6 },
   "gemini-2.5-pro":         { input: 1.25 / 1e6, output: 10.00 / 1e6 },
   "gemini-3-flash-preview": { input: 0.50 / 1e6, output: 3.00 / 1e6 },
-  "gemini-3-pro-preview":   { input: 2.00 / 1e6, output: 12.00 / 1e6 },
   "gemini-3.1-pro-preview": { input: 2.00 / 1e6, output: 12.00 / 1e6 },
   "gemini-3.1-pro-preview-customtools": { input: 2.00 / 1e6, output: 12.00 / 1e6 },
   "gemini-2.5-flash-image":    { input: 0.30 / 1e6, output: 30.00 / 1e6 },
   "gemini-3-pro-image-preview": { input: 2.00 / 1e6, output: 120.00 / 1e6 },
+  "gemini-3.1-flash-image-preview": { input: 0.25 / 1e6, output: 60.00 / 1e6 },
 };
 
 // Grounding with Google Search cost per prompt (USD)
@@ -39,10 +39,10 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
 // Approximated as per-prompt since exact query count is not exposed by the API
 const SEARCH_GROUNDING_COST: Record<string, number> = {
   "gemini-3-flash-preview": 14 / 1000,
-  "gemini-3-pro-preview":   14 / 1000,
   "gemini-3.1-pro-preview": 14 / 1000,
   "gemini-3.1-pro-preview-customtools": 14 / 1000,
   "gemini-3-pro-image-preview": 14 / 1000,
+  "gemini-3.1-flash-image-preview": 14 / 1000,
   "gemini-2.5-flash":       35 / 1000,
   "gemini-2.5-flash-lite":  35 / 1000,
   "gemini-2.5-pro":         35 / 1000,
@@ -55,12 +55,13 @@ interface ExtractUsageOptions {
   webSearchUsed?: boolean;
 }
 
-function extractUsage(usageMetadata: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number; thoughtsTokenCount?: number } | undefined, options?: ExtractUsageOptions): TracingUsage | undefined {
+function extractUsage(usageMetadata: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number; thoughtsTokenCount?: number; toolUsePromptTokenCount?: number } | undefined, options?: ExtractUsageOptions): TracingUsage | undefined {
   if (!usageMetadata) return undefined;
   const model = options?.model;
   const inputTokens = usageMetadata.promptTokenCount ?? 0;
   const outputTokens = usageMetadata.candidatesTokenCount ?? 0;
   const thinkingTokens = usageMetadata.thoughtsTokenCount ?? 0;
+  const toolUseTokens = usageMetadata.toolUsePromptTokenCount ?? 0;
   const pricing = model ? MODEL_PRICING[model] : undefined;
   const inputCost = pricing ? inputTokens * pricing.input : undefined;
   // candidatesTokenCount already includes thinking tokens in Gemini's accounting
@@ -76,6 +77,7 @@ function extractUsage(usageMetadata: { promptTokenCount?: number; candidatesToke
     input: usageMetadata.promptTokenCount,
     output: usageMetadata.candidatesTokenCount,
     thinking: thinkingTokens > 0 ? thinkingTokens : undefined,
+    toolUsePromptTokens: toolUseTokens > 0 ? toolUseTokens : undefined,
     total: usageMetadata.totalTokenCount,
     inputCost,
     outputCost,
@@ -494,6 +496,7 @@ export class GeminiClient {
     const totalUsage: TracingUsage = { input: 0, output: 0, total: 0 };
     // Track per-round usage (last chunk in each stream has the round's total)
     let roundUsage: TracingUsage | undefined;
+    let roundNumber = 0;
 
     let continueLoop = true;
 
@@ -522,6 +525,11 @@ export class GeminiClient {
       let response = await chat.sendMessageStream({ message: messageParts });
 
       while (continueLoop) {
+        roundNumber++;
+        const roundSpanId = tracing.spanStart(traceId, `round-${roundNumber}`, {
+          parentId: generationId ?? undefined,
+          metadata: { roundNumber },
+        });
         const functionCallsToProcess: Array<{ name: string; args: Record<string, unknown> }> = [];
         let groundingEmitted = false;
         const accumulatedSources: string[] = [];
@@ -608,6 +616,7 @@ export class GeminiClient {
           totalUsage.input = (totalUsage.input ?? 0) + (roundUsage.input ?? 0);
           totalUsage.output = (totalUsage.output ?? 0) + (roundUsage.output ?? 0);
           if (roundUsage.thinking !== undefined) totalUsage.thinking = (totalUsage.thinking ?? 0) + roundUsage.thinking;
+          if (roundUsage.toolUsePromptTokens !== undefined) totalUsage.toolUsePromptTokens = (totalUsage.toolUsePromptTokens ?? 0) + roundUsage.toolUsePromptTokens;
           totalUsage.total = (totalUsage.total ?? 0) + (roundUsage.total ?? 0);
           if (roundUsage.inputCost !== undefined) totalUsage.inputCost = (totalUsage.inputCost ?? 0) + roundUsage.inputCost;
           if (roundUsage.outputCost !== undefined) totalUsage.outputCost = (totalUsage.outputCost ?? 0) + roundUsage.outputCost;
@@ -625,8 +634,23 @@ export class GeminiClient {
           groundingEmitted = true;
         }
 
+        // Add retriever span for RAG/File Search grounding
+        if (!webSearchEnabled && accumulatedSources.length > 0) {
+          const retrieverSpanId = tracing.spanStart(traceId, "retriever:file-search", {
+            parentId: roundSpanId ?? undefined,
+            metadata: { sourceCount: accumulatedSources.length },
+          });
+          tracing.spanEnd(retrieverSpanId, {
+            output: accumulatedSources,
+            metadata: {
+              toolUsePromptTokens: roundUsage?.toolUsePromptTokens,
+            },
+          });
+        }
+
         // If no chunks received at all, likely an API error (e.g., 503)
         if (!hasReceivedChunk && functionCallsToProcess.length === 0) {
+          tracing.spanEnd(roundSpanId, { error: "No response received from API" });
           yield { type: "error", error: "No response received from API (possible server error)" };
           return;
         }
@@ -657,11 +681,13 @@ export class GeminiClient {
             if (roundUsage) {
               totalUsage.input = (totalUsage.input ?? 0) + (roundUsage.input ?? 0);
               totalUsage.output = (totalUsage.output ?? 0) + (roundUsage.output ?? 0);
+              if (roundUsage.toolUsePromptTokens !== undefined) totalUsage.toolUsePromptTokens = (totalUsage.toolUsePromptTokens ?? 0) + roundUsage.toolUsePromptTokens;
               totalUsage.total = (totalUsage.total ?? 0) + (roundUsage.total ?? 0);
               if (roundUsage.inputCost !== undefined) totalUsage.inputCost = (totalUsage.inputCost ?? 0) + roundUsage.inputCost;
               if (roundUsage.outputCost !== undefined) totalUsage.outputCost = (totalUsage.outputCost ?? 0) + roundUsage.outputCost;
               if (roundUsage.totalCost !== undefined) totalUsage.totalCost = (totalUsage.totalCost ?? 0) + roundUsage.totalCost;
             }
+            tracing.spanEnd(roundSpanId, { metadata: { reason: "function_call_limit", usage: roundUsage } });
             continueLoop = false;
             continue;
           }
@@ -762,11 +788,13 @@ export class GeminiClient {
             if (roundUsage) {
               totalUsage.input = (totalUsage.input ?? 0) + (roundUsage.input ?? 0);
               totalUsage.output = (totalUsage.output ?? 0) + (roundUsage.output ?? 0);
+              if (roundUsage.toolUsePromptTokens !== undefined) totalUsage.toolUsePromptTokens = (totalUsage.toolUsePromptTokens ?? 0) + roundUsage.toolUsePromptTokens;
               totalUsage.total = (totalUsage.total ?? 0) + (roundUsage.total ?? 0);
               if (roundUsage.inputCost !== undefined) totalUsage.inputCost = (totalUsage.inputCost ?? 0) + roundUsage.inputCost;
               if (roundUsage.outputCost !== undefined) totalUsage.outputCost = (totalUsage.outputCost ?? 0) + roundUsage.outputCost;
               if (roundUsage.totalCost !== undefined) totalUsage.totalCost = (totalUsage.totalCost ?? 0) + roundUsage.totalCost;
             }
+            tracing.spanEnd(roundSpanId, { metadata: { reason: "function_call_limit_with_skipped", usage: roundUsage } });
             continueLoop = false;
             continue;
           }
@@ -779,18 +807,27 @@ export class GeminiClient {
           }
 
           // Send function responses back to the chat
+          tracing.spanEnd(roundSpanId, { metadata: { toolCalls: callsToExecute.map(c => c.name), usage: roundUsage } });
           response = await chat.sendMessageStream({
             message: functionResponseParts,
           });
         } else {
+          tracing.spanEnd(roundSpanId, { metadata: { final: true, usage: roundUsage } });
           continueLoop = false;
         }
       }
 
+      const generationMetadata: Record<string, unknown> = { toolCallCount: toolCallTraceCount, roundCount: roundNumber };
+      if (totalUsage.toolUsePromptTokens) {
+        generationMetadata.toolUsePromptTokens = totalUsage.toolUsePromptTokens;
+        if (totalUsage.total) {
+          generationMetadata.ragTokenRatio = totalUsage.toolUsePromptTokens / totalUsage.total;
+        }
+      }
       tracing.generationEnd(generationId, {
         output: accumulatedOutput,
         usage: totalUsage.total ? totalUsage : undefined,
-        metadata: { toolCallCount: toolCallTraceCount },
+        metadata: generationMetadata,
       });
 
       yield { type: "done", usage: toStreamChunkUsage(totalUsage.total ? totalUsage : undefined) };
@@ -798,7 +835,7 @@ export class GeminiClient {
       tracing.generationEnd(generationId, {
         error: error instanceof Error ? error.message : "API call failed",
         usage: totalUsage.total ? totalUsage : undefined,
-        metadata: { toolCallCount: toolCallTraceCount },
+        metadata: { toolCallCount: toolCallTraceCount, roundCount: roundNumber },
       });
 
       yield {
@@ -968,10 +1005,11 @@ export class GeminiClient {
 
     // Build tools array
     // - Gemini 2.5 Flash Image: no tools supported
-    // - Gemini 3 Pro Image: Web Search only (no RAG)
+    // - Gemini 3+ Image models: Web Search only (no RAG)
     const tools: Tool[] = [];
+    const imageSupportsWebSearch = imageModel !== "gemini-2.5-flash-image";
 
-    if (imageModel === "gemini-3-pro-image-preview" && webSearchEnabled) {
+    if (imageSupportsWebSearch && webSearchEnabled) {
       tools.push({ googleSearch: {} } as Tool);
     }
 
@@ -992,8 +1030,8 @@ export class GeminiClient {
         },
       });
 
-      // Emit web search used if enabled (only for 3 Pro)
-      if (imageModel === "gemini-3-pro-image-preview" && webSearchEnabled) {
+      // Emit web search used if enabled (Gemini 3+ image models)
+      if (imageSupportsWebSearch && webSearchEnabled) {
         yield { type: "web_search_used" };
       }
 
@@ -1021,7 +1059,7 @@ export class GeminiClient {
         }
       }
 
-      const imageWebSearchUsed = imageModel === "gemini-3-pro-image-preview" && !!webSearchEnabled;
+      const imageWebSearchUsed = imageSupportsWebSearch && !!webSearchEnabled;
       const imageUsage = extractUsage(response.usageMetadata, { model: imageModel, webSearchUsed: imageWebSearchUsed });
       tracing.generationEnd(genId, {
         output: "[image generation completed]",
