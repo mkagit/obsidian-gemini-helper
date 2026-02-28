@@ -1159,20 +1159,33 @@ export class DriveSyncManager {
     }
 
     // Download and write (use vault API to update Obsidian's internal cache/file tree)
+    // Note: getAbstractFileByPath may return null even when the file exists on disk
+    // (e.g., during concurrent batch downloads, or if Obsidian's index hasn't caught up).
+    // Fall back to adapter.exists + modify if vault.create throws.
     const existingFile = this.app.vault.getAbstractFileByPath(vaultPath);
     if (isBinary) {
       const content = await drive.readFileRaw(accessToken, fileId);
       if (existingFile instanceof TFile) {
         await this.app.vault.modifyBinary(existingFile, content);
       } else {
-        await this.app.vault.createBinary(vaultPath, content);
+        try {
+          await this.app.vault.createBinary(vaultPath, content);
+        } catch {
+          // File may already exist on disk; fall back to adapter write
+          await this.app.vault.adapter.writeBinary(vaultPath, content);
+        }
       }
     } else {
       const content = await drive.readFile(accessToken, fileId);
       if (existingFile instanceof TFile) {
         await this.app.vault.modify(existingFile, content);
       } else {
-        await this.app.vault.create(vaultPath, content);
+        try {
+          await this.app.vault.create(vaultPath, content);
+        } catch {
+          // File may already exist on disk; fall back to adapter write
+          await this.app.vault.adapter.write(vaultPath, content);
+        }
       }
     }
 
@@ -1194,7 +1207,11 @@ export class DriveSyncManager {
       current = current ? `${current}/${part}` : part;
       const exists = await this.app.vault.adapter.exists(current);
       if (!exists) {
-        await this.app.vault.adapter.mkdir(current);
+        try {
+          await this.app.vault.adapter.mkdir(current);
+        } catch {
+          // Ignore: concurrent batch may have already created the directory
+        }
       }
     }
   }
@@ -1944,12 +1961,11 @@ export class DriveSyncManager {
       // Read existing settings.json from Drive
       const existingFile = await drive.findFileByExactName(accessToken, SETTINGS_FILE_NAME, rootFolderId);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let settings: Record<string, any> = {};
+      let settings: Record<string, unknown> = {};
       if (existingFile) {
         const content = await drive.readFile(accessToken, existingFile.id);
         try {
-          settings = JSON.parse(content);
+          settings = JSON.parse(content) as Record<string, unknown>;
         } catch {
           // Invalid JSON, start fresh
           settings = {};
@@ -1957,25 +1973,27 @@ export class DriveSyncManager {
       }
 
       // Ensure ragSettings structure exists
-      if (!settings.ragSettings) {
-        settings.ragSettings = {};
+      if (!settings.ragSettings || typeof settings.ragSettings !== "object") {
+        settings.ragSettings = {} as Record<string, unknown>;
       }
-      if (!settings.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY]) {
-        settings.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY] = {};
+      const ragSettings = settings.ragSettings as Record<string, Record<string, unknown>>;
+      if (!ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY]) {
+        ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY] = {};
       }
+      const storeSettings = ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY];
 
       // Merge files with status: "registered" for gemihub compatibility
       const gemihubFiles: Record<string, RagFileInfo & { status: string }> = {};
       for (const [path, info] of Object.entries(files)) {
         gemihubFiles[path] = { ...info, status: "registered" };
       }
-      settings.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY].files = gemihubFiles;
+      storeSettings.files = gemihubFiles;
 
       // Copy storeId from local ragSetting
       const localRagSetting = this.plugin.workspaceState.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY];
       if (localRagSetting) {
-        settings.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY].storeId = localRagSetting.storeId;
-        settings.ragSettings[DriveSyncManager.GEMIHUB_RAG_STORE_KEY].storeName = localRagSetting.storeName;
+        storeSettings.storeId = localRagSetting.storeId;
+        storeSettings.storeName = localRagSetting.storeName;
       }
 
       // Set ragEnabled and selectedRagSetting if files are registered
