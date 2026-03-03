@@ -442,7 +442,7 @@ export class GeminiClient {
       const modelLower = this.model.toLowerCase();
       const thinkingRequired = modelLower.includes("gemini-3-pro") || modelLower.includes("gemini-3.1-pro");
       if (!enableThinking && !thinkingRequired) return { thinkingBudget: 0 };
-      if (modelLower.includes("flash-lite")) {
+      if (modelLower === "gemini-2.5-flash-lite") {
         return { includeThoughts: true, thinkingBudget: -1 };
       }
       return { includeThoughts: true };
@@ -811,7 +811,7 @@ export class GeminiClient {
     const getThinkingConfig = () => {
       if (!supportsThinking) return undefined;
       const modelLower = this.model.toLowerCase();
-      if (modelLower.includes("flash-lite")) {
+      if (modelLower === "gemini-2.5-flash-lite") {
         return { includeThoughts: true, thinkingBudget: -1 };
       }
       return { includeThoughts: true };
