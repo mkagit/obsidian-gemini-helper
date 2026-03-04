@@ -188,6 +188,9 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	const [decryptPassword, setDecryptPassword] = useState("");
 	// Pending feedback for edit rejection (to be sent after state update)
 	const [pendingEditFeedback, setPendingEditFeedback] = useState<{ filePath: string; request: string } | null>(null);
+	// Thinking toggles for Flash / Flash Lite models
+	const [thinkFlash, setThinkFlash] = useState(false);
+	const [thinkFlashLite, setThinkFlashLite] = useState(true);
 
 	// CLI provider state (CLI not available on mobile)
 	const geminiCliVerified = !Platform.isMobile && cliConfig.cliVerified === true;
@@ -204,6 +207,14 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 
 	const allowWebSearch = !isCliMode;
 	const allowRag = ragEnabledState && !isCliMode;
+
+	// Resolve thinking toggle for a given model name
+	const getThinkingToggle = (model: string): boolean | undefined => {
+		const m = model.toLowerCase();
+		if (m.includes("flash-lite")) return thinkFlashLite ? true : undefined;
+		if (m.includes("flash") && !m.includes("pro")) return thinkFlash ? true : undefined;
+		return undefined;
+	};
 
 	// Build available models list (verified CLI options first)
 	const baseModels = getAvailableModels(apiPlan);
@@ -640,16 +651,9 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 			setVaultToolNoneReason("gemma");
 			setMcpServers(servers => servers.map(s => ({ ...s, enabled: false })));
 		} else if (isImageGenerationModel(model)) {
-			// 2.5 Flash Image: no tools supported → force None
-			// Gemini 3+ image models: Web Search only → keep if Web Search, else None
-			if (model === "gemini-2.5-flash-image") {
-				if (selectedRagSetting !== null) {
-					handleRagSettingChange(null);
-				}
-			} else {
-				if (selectedRagSetting !== null && selectedRagSetting !== "__websearch__") {
-					handleRagSettingChange(null);
-				}
+			// Image models: Web Search only → keep if Web Search, else None
+			if (selectedRagSetting !== null && selectedRagSetting !== "__websearch__") {
+				handleRagSettingChange(null);
 			}
 			// Reset vault tool mode for image generation models
 			setVaultToolMode("all");
@@ -1122,9 +1126,6 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 			} else if (isModelAllowedForPlan(apiPlan, "gemini-3-pro-image-preview")) {
 				allowedModel = "gemini-3-pro-image-preview";
 				autoSwitchedToImage = true;
-			} else if (isModelAllowedForPlan(apiPlan, "gemini-2.5-flash-image")) {
-				allowedModel = "gemini-2.5-flash-image";
-				autoSwitchedToImage = true;
 			}
 			// If neither is available, keep current model
 		}
@@ -1505,7 +1506,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 
 					// Check if Web Search or Image Generation model is selected
 				const isWebSearch = allowWebSearch && selectedRagSetting === "__websearch__"
-					&& (toolsEnabled || (isImageGenerationModel(allowedModel) && allowedModel !== "gemini-2.5-flash-image"));
+					&& (toolsEnabled || isImageGenerationModel(allowedModel));
 				const isImageGeneration = isImageGenerationModel(allowedModel);
 
 				// Pass RAG store IDs if RAG is enabled and a setting is selected (not web search)
@@ -1593,6 +1594,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 								functionCallWarningThreshold: settings.functionCallWarningThreshold,
 							},
 							disableTools: !toolsEnabled,
+							enableThinking: getThinkingToggle(allowedModel),
 							traceId,
 						}
 					);
@@ -2054,6 +2056,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 						isLoading={isLoading}
 						onApplyEdit={handleApplyEdit}
 						onDiscardEdit={handleDiscardEdit}
+						alwaysThink={getThinkingToggle(currentModel) === true}
 						app={plugin.app}
 						workspaceFolder={getChatHistoryFolder()}
 					/>
@@ -2076,6 +2079,10 @@ Always be helpful and provide clear, concise responses. When working with notes,
 						vaultToolMode={vaultToolMode}
 						onVaultToolModeChange={handleVaultToolModeChange}
 						vaultToolModeOnlyNone={isCliMode || isGemmaModel || !!selectedRagSetting}
+						thinkFlash={thinkFlash}
+						thinkFlashLite={thinkFlashLite}
+						onThinkFlashChange={setThinkFlash}
+						onThinkFlashLiteChange={setThinkFlashLite}
 						mcpServers={mcpServers}
 						onMcpServerToggle={handleMcpServerToggle}
 						slashCommands={plugin.settings.slashCommands}
