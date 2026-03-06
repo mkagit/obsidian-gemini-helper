@@ -230,8 +230,22 @@ export function toLocalSyncMeta(
     : {};
 
   for (const [id, f] of Object.entries(remoteMeta.files)) {
-    const vaultPath = f.path || f.name;
-    const stats = vaultStats?.get(vaultPath);
+    const remotePath = f.path || f.name;
+    // On case-insensitive FS (NTFS, macOS), the existing local path may differ
+    // in case from the remote path. Prefer the local (actual vault) path when
+    // paths match case-insensitively to avoid path mismatches in subsequent syncs.
+    let resolvedPath = remotePath;
+    for (const [existingPath, existingId] of Object.entries(pathToId)) {
+      if (existingId === id) {
+        if (existingPath.toLowerCase() === remotePath.toLowerCase()) {
+          resolvedPath = existingPath;
+        } else {
+          delete pathToId[existingPath];
+        }
+        break;
+      }
+    }
+    const stats = vaultStats?.get(resolvedPath);
     const existing = existingLocal?.files[id];
     // Only carry over cached mtime/size if checksum hasn't changed;
     // otherwise the cached values are stale and must be recomputed.
@@ -243,14 +257,7 @@ export function toLocalSyncMeta(
       localMtime: stats?.mtime ?? (checksumUnchanged ? existing.localMtime : undefined),
       localSize: stats?.size ?? (checksumUnchanged ? existing.localSize : undefined),
     };
-    // Update path mapping (use name as fallback for GemiHub-created files without path)
-    // Remove old mapping for this ID (in case path changed)
-    for (const [existingPath, existingId] of Object.entries(pathToId)) {
-      if (existingId === id && existingPath !== vaultPath) {
-        delete pathToId[existingPath];
-      }
-    }
-    pathToId[vaultPath] = id;
+    pathToId[resolvedPath] = id;
   }
 
   // Remove stale pathToId entries for files no longer in remoteMeta
