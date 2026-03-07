@@ -107,10 +107,11 @@ export function displayWorkspaceSettings(containerEl: HTMLElement, ctx: Settings
     text.inputEl.addClass("gemini-helper-settings-textarea");
   });
 
-  // Tool limits
-  new Setting(containerEl).setName(t("settings.toolLimits")).setHeading();
+  // Tool limits (collapsible)
+  const detailsEl = containerEl.createEl("details", { cls: "gemini-helper-settings-details" });
+  detailsEl.createEl("summary", { text: t("settings.toolLimits"), cls: "gemini-helper-settings-summary" });
 
-  new Setting(containerEl)
+  new Setting(detailsEl)
     .setName(t("settings.maxToolCalls"))
     .setDesc(t("settings.maxToolCalls.desc"))
     .addSlider((slider) =>
@@ -148,7 +149,7 @@ export function displayWorkspaceSettings(containerEl: HTMLElement, ctx: Settings
         })
     );
 
-  new Setting(containerEl)
+  new Setting(detailsEl)
     .setName(t("settings.toolCallWarning"))
     .setDesc(t("settings.toolCallWarning.desc"))
     .addSlider((slider) =>
@@ -181,7 +182,7 @@ export function displayWorkspaceSettings(containerEl: HTMLElement, ctx: Settings
         })
     );
 
-  new Setting(containerEl)
+  new Setting(detailsEl)
     .setName(t("settings.listNotesLimit"))
     .setDesc(t("settings.listNotesLimit.desc"))
     .addSlider((slider) =>
@@ -209,7 +210,7 @@ export function displayWorkspaceSettings(containerEl: HTMLElement, ctx: Settings
         })
     );
 
-  new Setting(containerEl)
+  new Setting(detailsEl)
     .setName(t("settings.maxNoteChars"))
     .setDesc(t("settings.maxNoteChars.desc"))
     .addSlider((slider) =>
