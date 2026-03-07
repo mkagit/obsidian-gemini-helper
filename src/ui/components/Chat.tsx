@@ -32,7 +32,7 @@ import {
 } from "src/types";
 import { getGeminiClient } from "src/core/gemini";
 import { tracing } from "src/core/tracingHooks";
-import { getEnabledTools } from "src/core/tools";
+import { getEnabledTools, skillWorkflowTool } from "src/core/tools";
 import { fetchMcpTools, createMcpToolExecutor, isMcpTool, type McpToolDefinition, type McpToolExecutor } from "src/core/mcpTools";
 import { GeminiCliProvider, ClaudeCliProvider, CodexCliProvider } from "src/core/cliProvider";
 import { createToolExecutor } from "src/vault/toolExecutor";
@@ -63,6 +63,7 @@ import {
 	promptForBulkEditConfirmation,
 	promptForBulkDeleteConfirmation,
 	promptForBulkRenameConfirmation,
+	type EditConfirmationResult,
 } from "./workflow/EditConfirmationModal";
 import MessageList from "./MessageList";
 import InputArea, { type InputAreaHandle } from "./InputArea";
@@ -72,6 +73,9 @@ import {
 } from "src/core/crypto";
 import { cryptoCache } from "src/core/cryptoCache";
 import { formatError } from "src/utils/error";
+import { discoverSkills, loadSkill, buildSkillSystemPrompt, collectSkillWorkflows, type SkillMetadata, type LoadedSkill, type SkillWorkflowRef } from "src/core/skillsLoader";
+import { parseWorkflowFromMarkdown } from "src/workflow/parser";
+import { WorkflowExecutor } from "src/workflow/executor";
 import { t } from "src/i18n";
 import {
 	shouldUseImageModel,
@@ -191,6 +195,10 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	// Thinking toggles for Flash / Flash Lite models
 	const [thinkFlash, setThinkFlash] = useState(false);
 	const [thinkFlashLite, setThinkFlashLite] = useState(true);
+
+	// Agent Skills state
+	const [availableSkills, setAvailableSkills] = useState<SkillMetadata[]>([]);
+	const [activeSkillPaths, setActiveSkillPaths] = useState<string[]>([]);
 
 	// CLI provider state (CLI not available on mobile)
 	const geminiCliVerified = !Platform.isMobile && cliConfig.cliVerified === true;
@@ -398,6 +406,12 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	useEffect(() => {
 		void loadChatHistories();
 	}, [loadChatHistories]);
+
+	// Discover available skills
+	useEffect(() => {
+		const skillsFolderPath = plugin.settings.skillsFolderPath || "skills";
+		void discoverSkills(plugin.app, skillsFolderPath).then(setAvailableSkills);
+	}, [plugin]);
 
 	// Cleanup MCP executor on unmount
 	useEffect(() => {
@@ -943,7 +957,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	};
 
 	// Send message via CLI provider
-	const sendMessageViaCli = async (content: string, attachments?: Attachment[]) => {
+	const sendMessageViaCli = async (content: string, attachments?: Attachment[], skillPath?: string) => {
 		const isClaudeCli = currentModel === "claude-cli";
 		const isCodexCli = currentModel === "codex-cli";
 		const provider = isClaudeCli
@@ -952,13 +966,27 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 				? new CodexCliProvider()
 				: new GeminiCliProvider();
 
+		// Activate skill if invoked via slash command
+		let effectiveSkillPaths = activeSkillPaths;
+		if (skillPath && !effectiveSkillPaths.includes(skillPath)) {
+			effectiveSkillPaths = [...effectiveSkillPaths, skillPath];
+			setActiveSkillPaths(effectiveSkillPaths);
+		}
+
 		// Resolve variables in the content
 		const resolvedContent = await resolveMessageVariables(content);
+
+		// When skill is invoked without message, use skill name as trigger
+		let displayContent = resolvedContent.trim();
+		if (!displayContent && skillPath) {
+			const skillMeta = availableSkills.find(s => s.folderPath === skillPath);
+			displayContent = skillMeta ? `/${skillMeta.name}` : "/skill";
+		}
 
 		// Add user message
 		const userMessage: Message = {
 			role: "user",
-			content: resolvedContent.trim() || (attachments ? `[${attachments.length} file(s) attached]` : ""),
+			content: displayContent || (attachments ? `[${attachments.length} file(s) attached]` : ""),
 			timestamp: Date.now(),
 			attachments,
 		};
@@ -994,6 +1022,21 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 
 			if (plugin.settings.systemPrompt) {
 				systemPrompt += `\n\nAdditional instructions: ${plugin.settings.systemPrompt}`;
+			}
+
+			// Inject active agent skills into system prompt
+			let cliLoadedSkills: LoadedSkill[] = [];
+			if (effectiveSkillPaths.length > 0) {
+				const activeMetadata = availableSkills.filter(s => effectiveSkillPaths.includes(s.folderPath));
+				if (activeMetadata.length > 0) {
+					cliLoadedSkills = await Promise.all(
+						activeMetadata.map(m => loadSkill(plugin.app, m))
+					);
+					const skillPrompt = buildSkillSystemPrompt(cliLoadedSkills, { cliMode: true });
+					if (skillPrompt) {
+						systemPrompt += skillPrompt;
+					}
+				}
 			}
 
 			let fullContent = "";
@@ -1058,10 +1101,26 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 				setCliSession(newSession);
 			}
 
+			// Detect and execute [RUN_WORKFLOW: id](variables) markers from skill workflows
+			const workflowMarkerRegex = /\[RUN_WORKFLOW:\s*(.+?)\](?:\((\{[\s\S]*?\})\))?/g;
+			let workflowMatch: RegExpExecArray | null;
+			let processedContent = fullContent;
+			if (cliLoadedSkills.length > 0 && (workflowMatch = workflowMarkerRegex.exec(fullContent)) !== null) {
+				const workflowId = workflowMatch[1].trim();
+				const variablesJson = workflowMatch[2] || undefined;
+				const skillWorkflowMap = collectSkillWorkflows(cliLoadedSkills);
+				const workflowResult = await executeSkillWorkflow(plugin, workflowId, variablesJson, skillWorkflowMap);
+				// Replace marker with execution result
+				const resultText = JSON.stringify(workflowResult, null, 2);
+				processedContent = fullContent.replace(workflowMatch[0],
+					`**Workflow executed: ${workflowId}**\n\`\`\`json\n${resultText}\n\`\`\``
+				);
+			}
+
 			// Add assistant message with CLI model info
 			const assistantMessage: Message = {
 				role: "assistant",
-				content: fullContent,
+				content: processedContent,
 				timestamp: Date.now(),
 				model: currentProvider,
 			};
@@ -1071,7 +1130,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 			// Save chat history (with session info)
 			await saveCurrentChat(newMessages, newSession || undefined);
 
-			tracing.traceEnd(cliTraceId, { output: fullContent });
+			tracing.traceEnd(cliTraceId, { output: processedContent });
 			tracing.score(cliTraceId, {
 				name: "status",
 				value: stopped ? 0.5 : 1,
@@ -1096,12 +1155,12 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	};
 
 	// Send message to Gemini
-	const sendMessage = async (content: string, attachments?: Attachment[]) => {
-		if ((!content.trim() && (!attachments || attachments.length === 0)) || isLoading) return;
+	const sendMessage = async (content: string, attachments?: Attachment[], skillPath?: string) => {
+		if ((!content.trim() && !skillPath && (!attachments || attachments.length === 0)) || isLoading) return;
 
 		// Use CLI provider if in CLI mode
 		if (isCliMode) {
-			await sendMessageViaCli(content, attachments);
+			await sendMessageViaCli(content, attachments, skillPath);
 			return;
 		}
 
@@ -1140,10 +1199,17 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 		// Resolve variables in the content ({selection}, {content}, file paths)
 		const resolvedContent = await resolveMessageVariables(content);
 
+		// When skill is invoked without message, use skill name as trigger
+		let displayContent = resolvedContent.trim();
+		if (!displayContent && skillPath) {
+			const skillMeta = availableSkills.find(s => s.folderPath === skillPath);
+			displayContent = skillMeta ? `/${skillMeta.name}` : "/skill";
+		}
+
 		// Add user message
 		const userMessage: Message = {
 			role: "user",
-			content: resolvedContent.trim() || (attachments ? `[${attachments.length} file(s) attached]` : ""),
+			content: displayContent || (attachments ? `[${attachments.length} file(s) attached]` : ""),
 			timestamp: Date.now(),
 			attachments,
 		};
@@ -1179,6 +1245,24 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					allowDelete: true,
 					ragEnabled: allowRag,
 				}) : [];
+
+				// Activate skill if invoked via slash command
+				let effectiveSkillPaths = activeSkillPaths;
+				if (skillPath && !effectiveSkillPaths.includes(skillPath)) {
+					effectiveSkillPaths = [...effectiveSkillPaths, skillPath];
+					setActiveSkillPaths(effectiveSkillPaths);
+				}
+
+				// Load active skills (needed for both workflow tools and system prompt)
+				let loadedSkillsList: LoadedSkill[] = [];
+				if (effectiveSkillPaths.length > 0) {
+					const activeMetadata = availableSkills.filter(s => effectiveSkillPaths.includes(s.folderPath));
+					if (activeMetadata.length > 0) {
+						loadedSkillsList = await Promise.all(
+							activeMetadata.map(m => loadSkill(plugin.app, m))
+						);
+					}
+				}
 
 				// Fetch MCP tools from enabled servers only (skip if vaultToolMode is "none")
 				const enabledMcpServers = vaultToolMode !== "none"
@@ -1227,6 +1311,11 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					return true; // "all" mode - keep all tools
 				});
 
+				// Add run_skill_workflow tool if any active skill has workflows
+				if (toolsEnabled && loadedSkillsList.some(s => s.workflows.length > 0)) {
+					tools.push(skillWorkflowTool);
+				}
+
 				// Create context for RAG tools (Obsidian tools only)
 				const obsidianToolExecutor = toolsEnabled
 					? createToolExecutor(plugin.app, {
@@ -1249,8 +1338,13 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 				// Track pending additional request for edit feedback (use container to bypass TS narrowing)
 				const pendingAdditionalRequestRef: { current: { filePath: string; request: string } | null } = { current: null };
 
-				// Combined tool executor that routes to Obsidian or MCP executor based on tool name
-				const baseToolExecutor = (obsidianToolExecutor || mcpToolExecutor)
+				// Build skill workflow map for tool execution
+				const skillWorkflowMap = loadedSkillsList.length > 0
+					? collectSkillWorkflows(loadedSkillsList)
+					: new Map();
+
+				// Combined tool executor that routes to Obsidian, MCP, or Skill Workflow based on tool name
+				const baseToolExecutor = (obsidianToolExecutor || mcpToolExecutor || skillWorkflowMap.size > 0)
 					? async (name: string, args: Record<string, unknown>) => {
 						// MCP tools start with "mcp_"
 						if (name.startsWith("mcp_") && mcpToolExecutor) {
@@ -1264,6 +1358,15 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 								return { error: mcpResult.error };
 							}
 							return { result: mcpResult.result };
+						}
+						// Skill workflow tool
+						if (name === "run_skill_workflow" && skillWorkflowMap.size > 0) {
+							return await executeSkillWorkflow(
+								plugin,
+								args.workflowId as string,
+								args.variables as string | undefined,
+								skillWorkflowMap,
+							);
 						}
 						// Otherwise use Obsidian tool executor
 						if (obsidianToolExecutor) {
@@ -1549,6 +1652,16 @@ Always be helpful and provide clear, concise responses. When working with notes,
 					systemPrompt += `\n\nAdditional instructions: ${settings.systemPrompt}`;
 				}
 
+				// Inject active agent skills into system prompt
+				let skillsUsedNames: string[] = [];
+				if (loadedSkillsList.length > 0) {
+					const skillPrompt = buildSkillSystemPrompt(loadedSkillsList);
+					if (skillPrompt) {
+						systemPrompt += skillPrompt;
+						skillsUsedNames = loadedSkillsList.map(s => s.name);
+					}
+				}
+
 				const supportsSystemInstruction = !allowedModel.toLowerCase().includes("gemma");
 				const systemPromptForModel = supportsSystemInstruction ? systemPrompt : undefined;
 				const userMessageForModel = supportsSystemInstruction
@@ -1684,6 +1797,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 					timestamp: Date.now(),
 					model: allowedModel,
 					toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+					skillsUsed: skillsUsedNames.length > 0 ? skillsUsedNames : undefined,
 					pendingEdit: pendingEditInfo,
 					pendingDelete: pendingDeleteInfo,
 					pendingRename: pendingRenameInfo,
@@ -2063,8 +2177,8 @@ Always be helpful and provide clear, concise responses. When working with notes,
 
 					<InputArea
 						ref={inputAreaRef}
-						onSend={(content, attachments) => {
-							void sendMessage(content, attachments);
+						onSend={(content, attachments, skillPath) => {
+							void sendMessage(content, attachments, skillPath);
 						}}
 						onStop={stopMessage}
 						isLoading={isLoading}
@@ -2087,6 +2201,15 @@ Always be helpful and provide clear, concise responses. When working with notes,
 						onMcpServerToggle={handleMcpServerToggle}
 						slashCommands={plugin.settings.slashCommands}
 						onSlashCommand={handleSlashCommand}
+						availableSkills={availableSkills}
+						activeSkillPaths={activeSkillPaths}
+						onToggleSkill={(folderPath) => {
+							setActiveSkillPaths(prev =>
+								prev.includes(folderPath)
+									? prev.filter(p => p !== folderPath)
+									: [...prev, folderPath]
+							);
+						}}
 						onCompact={() => { void handleCompact(); }}
 						messageCount={messages.length}
 						isCompacting={isCompacting}
@@ -2114,5 +2237,106 @@ Always be helpful and provide clear, concise responses. When working with notes,
 });
 
 Chat.displayName = "Chat";
+
+/**
+ * Execute a skill workflow headlessly and return results.
+ */
+async function executeSkillWorkflow(
+	plugin: GeminiHelperPlugin,
+	workflowId: string,
+	variablesJson: string | undefined,
+	skillWorkflowMap: Map<string, {
+		skill: LoadedSkill;
+		workflowRef: SkillWorkflowRef;
+		vaultPath: string;
+	}>,
+): Promise<Record<string, unknown>> {
+	const entry = skillWorkflowMap.get(workflowId);
+	if (!entry) {
+		const available = [...skillWorkflowMap.keys()].join(", ");
+		return { error: `Unknown workflow ID: ${workflowId}. Available: ${available}` };
+	}
+
+	const { workflowRef, vaultPath } = entry;
+
+	// Read workflow file
+	const file = plugin.app.vault.getAbstractFileByPath(vaultPath);
+	if (!(file instanceof TFile)) {
+		return { error: `Workflow file not found: ${vaultPath}` };
+	}
+
+	const content = await plugin.app.vault.read(file);
+
+	// Parse workflow
+	let workflow;
+	try {
+		workflow = parseWorkflowFromMarkdown(content, workflowRef.name);
+	} catch (e) {
+		return { error: `Failed to parse workflow: ${e instanceof Error ? e.message : String(e)}` };
+	}
+
+	// Build input variables
+	const variables = new Map<string, string | number>();
+	if (variablesJson) {
+		try {
+			const parsed = JSON.parse(variablesJson) as Record<string, string | number>;
+			for (const [key, value] of Object.entries(parsed)) {
+				variables.set(key, value);
+			}
+		} catch {
+			return { error: `Invalid variables JSON: ${variablesJson}` };
+		}
+	}
+
+	// Execute workflow headlessly (no interactive prompts)
+	const executor = new WorkflowExecutor(plugin.app, plugin);
+
+	const headlessCallbacks = {
+		promptForFile: () => Promise.resolve(null),
+		promptForSelection: () => Promise.resolve(null),
+		promptForValue: () => Promise.resolve(null),
+		promptForConfirmation: () => {
+			return Promise.resolve({ confirmed: true } as EditConfirmationResult);
+		},
+	};
+
+	try {
+		const result = await executor.execute(
+			workflow,
+			{ variables },
+			undefined,
+			{ workflowPath: vaultPath, workflowName: workflowRef.name },
+			headlessCallbacks,
+		);
+
+		// Collect output variables
+		const outputVars: Record<string, string | number> = {};
+		result.context.variables.forEach((value, key) => {
+			// Skip internal variables
+			if (!key.startsWith("__")) {
+				outputVars[key] = value;
+			}
+		});
+
+		// Collect log summaries
+		const logs = result.context.logs.map(log => ({
+			node: log.nodeType,
+			status: log.status,
+			message: log.message,
+		}));
+
+		return {
+			success: true,
+			workflowId,
+			variables: outputVars,
+			logs,
+		};
+	} catch (e) {
+		return {
+			error: `Workflow execution failed: ${e instanceof Error ? e.message : String(e)}`,
+			workflowId,
+		};
+	}
+}
 
 export default Chat;

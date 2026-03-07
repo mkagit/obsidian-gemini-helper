@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent, forwardRef, us
 import { Send, Paperclip, StopCircle, Loader2, Eye, Database, ChevronUp, ChevronDown } from "lucide-react";
 import { Notice, Platform, type App } from "obsidian";
 import { isImageGenerationModel, type ModelInfo, type ModelType, type Attachment, type SlashCommand, type McpServerConfig, type VaultToolMode } from "src/types";
+import type { SkillMetadata } from "src/core/skillsLoader";
+import SkillSelector from "./SkillSelector";
 import { t } from "src/i18n";
 
 // Built-in command definition (not user-configurable)
@@ -13,7 +15,7 @@ interface BuiltInCommand {
 }
 
 interface InputAreaProps {
-  onSend: (content: string, attachments?: Attachment[]) => void | Promise<void>;
+  onSend: (content: string, attachments?: Attachment[], skillPath?: string) => void | Promise<void>;
   onStop?: () => void;
   isLoading: boolean;
   model: ModelType;
@@ -35,6 +37,9 @@ interface InputAreaProps {
   onMcpServerToggle: (serverName: string, enabled: boolean) => void; // Per-server toggle handler
   slashCommands: SlashCommand[];
   onSlashCommand: (command: SlashCommand) => string;
+  availableSkills: SkillMetadata[];
+  activeSkillPaths: string[];
+  onToggleSkill: (folderPath: string) => void;
   onCompact?: () => void; // Built-in /compact command handler
   messageCount?: number; // Number of messages (to enable/disable /compact)
   isCompacting?: boolean; // Whether compact is in progress
@@ -90,6 +95,9 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
   onMcpServerToggle,
   slashCommands,
   onSlashCommand,
+  availableSkills,
+  activeSkillPaths,
+  onToggleSkill,
   onCompact,
   messageCount = 0,
   isCompacting = false,
@@ -189,6 +197,22 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
         }
         return;
       }
+      // Intercept /skillFolder command — send with skill path as metadata
+      if (input.trim().startsWith("/")) {
+        const trimmed = input.trim();
+        for (const skill of availableSkills) {
+          const folderName = skill.folderPath.split("/").pop() || "";
+          const prefix = `/${folderName}`;
+          if (trimmed.toLowerCase().startsWith(prefix.toLowerCase()) &&
+              (trimmed.length === prefix.length || trimmed[prefix.length] === " ")) {
+            const userMessage = trimmed.slice(prefix.length).trim();
+            void onSend(userMessage, pendingAttachments.length > 0 ? pendingAttachments : undefined, skill.folderPath);
+            setInput("");
+            setPendingAttachments([]);
+            return;
+          }
+        }
+      }
       void onSend(input, pendingAttachments.length > 0 ? pendingAttachments : undefined);
       setInput("");
       setPendingAttachments([]);
@@ -211,6 +235,17 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
           id: "__compact__",
           name: "compact",
           description: t("command.compact"),
+          isBuiltIn: true,
+        });
+      }
+
+      // Add all skills as built-in commands (use folder name as command name)
+      for (const skill of availableSkills) {
+        const folderName = skill.folderPath.split("/").pop() || "";
+        builtInCommands.push({
+          id: `__skill__${skill.folderPath}`,
+          name: folderName,
+          description: `${skill.name}${skill.description ? ` - ${skill.description}` : ""}`,
           isBuiltIn: true,
         });
       }
@@ -255,6 +290,14 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
       if (command.id === "__compact__" && onCompact) {
         setInput("");
         onCompact();
+      }
+      // Handle skill — send immediately with skill path
+      if (command.id.startsWith("__skill__")) {
+        const folderPath = command.id.slice("__skill__".length);
+        const userMessage = input.replace(/^\/\S*\s*/, "").trim();
+        void onSend(userMessage, pendingAttachments.length > 0 ? pendingAttachments : undefined, folderPath);
+        setInput("");
+        setPendingAttachments([]);
       }
       return;
     }
@@ -470,7 +513,9 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
                 onClick={() => selectCommand(cmd)}
                 onMouseEnter={() => setAutocompleteIndex(index)}
               >
-                <span className="gemini-helper-autocomplete-name">/{cmd.name}</span>
+                <span className="gemini-helper-autocomplete-name">
+                  {"id" in cmd && (cmd as BuiltInCommand).id?.startsWith("__skill__") ? `✨ /${cmd.name}` : `/${cmd.name}`}
+                </span>
                 {("description" in cmd) && cmd.description && (
                   <span className="gemini-helper-autocomplete-desc">
                     {cmd.description}
@@ -749,6 +794,14 @@ const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea
             ))}
           </select>
         </div>
+      )}
+      {!isCollapsed && availableSkills.length > 0 && (
+        <SkillSelector
+          skills={availableSkills}
+          activeSkillPaths={activeSkillPaths}
+          onToggleSkill={onToggleSkill}
+          disabled={isLoading}
+        />
       )}
     </div>
   );

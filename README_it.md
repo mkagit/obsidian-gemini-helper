@@ -249,6 +249,19 @@ Alcuni strumenti MCP restituiscono UI interattiva che permette di interagire vis
 
 > **Sicurezza:** Tutto il contenuto MCP App viene eseguito in un iframe sandboxed con permessi limitati. L'iframe non può accedere al DOM della pagina padre, ai cookie o al localStorage. Solo `allow-scripts` e `allow-forms` sono abilitati.
 
+## Skill dell'Agente
+
+Estendi le capacità dell'IA con istruzioni personalizzate, materiali di riferimento e workflow eseguibili. Gli skill seguono il modello standard del settore per gli skill dell'agente (es. [OpenAI Codex](https://github.com/openai/codex) `.codex/skills/`).
+
+- **Istruzioni personalizzate** - Definisci il comportamento specifico del dominio tramite file `SKILL.md`
+- **Materiali di riferimento** - Includi guide di stile, modelli e checklist in `references/`
+- **Integrazione dei workflow** - Gli skill possono esporre workflow come strumenti di Function Calling
+- **Comando slash** - Digita `/folder-name` per invocare uno skill istantaneamente e inviare
+- **Supporto modalità CLI** - Gli skill funzionano con i backend Gemini CLI, Claude CLI e Codex CLI
+- **Attivazione selettiva** - Scegli quali skill sono attivi per conversazione
+
+> **Per le istruzioni di configurazione e gli esempi, consulta [SKILLS.md](docs/SKILLS_it.md)**
+
 ---
 
 # Workflow Builder

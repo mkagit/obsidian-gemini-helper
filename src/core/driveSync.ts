@@ -538,11 +538,20 @@ export class DriveSyncManager {
       };
 
       // Push count = modified files + new files + renames + local deletions (excluding excluded paths)
+      // Verify deletedIds with adapter.exists to avoid false positives from Obsidian index lag
+      let verifiedDeletedCount = 0;
+      for (const id of deletedIds) {
+        if (isExcludedId(id)) continue;
+        const path = resolvePath(id);
+        if (path && !(await this.app.vault.adapter.exists(path))) {
+          verifiedDeletedCount++;
+        }
+      }
       const pushCount = diff.toPush.filter(id => !isExcludedId(id)).length
         + [...newPaths].filter(p => !this.isExcludedPath(p)).length
         + [...renames].filter(([, newPath]) => !this.isExcludedPath(newPath)).length
         + diff.editDeleteConflicts.filter(id => !isExcludedId(id)).length
-        + [...deletedIds].filter(id => !isExcludedId(id)).length;
+        + verifiedDeletedCount;
       this.localModifiedCount = pushCount;
 
       // Pull count = remote changes + remote-only + locally-deleted-remotely + conflicts (excluding excluded paths)
@@ -583,6 +592,15 @@ export class DriveSyncManager {
 
       const idToPath = buildIdToPathMap(localMeta);
 
+      // Verify deletedIds with adapter.exists to avoid false positives from Obsidian index lag
+      let verifiedLocalDeletedCount = 0;
+      for (const id of deletedIds) {
+        const path = idToPath[id];
+        if (path && this.isExcludedPath(path)) continue;
+        if (!path || !(await this.app.vault.adapter.exists(path))) {
+          verifiedLocalDeletedCount++;
+        }
+      }
       const pushCount =
         [...modifiedIds].filter(id => {
           const path = idToPath[id];
@@ -590,10 +608,7 @@ export class DriveSyncManager {
         }).length
         + [...newPaths].filter(p => !this.isExcludedPath(p)).length
         + [...renames].filter(([, newPath]) => !this.isExcludedPath(newPath)).length
-        + [...deletedIds].filter(id => {
-          const path = idToPath[id];
-          return !path || !this.isExcludedPath(path);
-        }).length;
+        + verifiedLocalDeletedCount;
 
       this.localModifiedCount = pushCount;
     } catch (err) {
@@ -682,15 +697,18 @@ export class DriveSyncManager {
       }
       // Show locally deleted files (will be moved to trash/ on Drive)
       // Both localOnly (in localMeta only) and deletedIds (in both metas but deleted from disk)
+      // Verify with adapter.exists to avoid false positives from Obsidian index lag
       for (const id of diff.localOnly) {
         const path = idToPath[id];
-        if (path && !checksums.has(path)) {
+        if (path && !checksums.has(path) && !(await this.app.vault.adapter.exists(path))) {
           files.push({ id, name: path, type: "deleted" });
         }
       }
+      const deletedIdsSeen = new Set(diff.localOnly);
       for (const id of deletedIds) {
+        if (deletedIdsSeen.has(id)) continue;
         const path = idToPath[id];
-        if (path) {
+        if (path && !(await this.app.vault.adapter.exists(path))) {
           files.push({ id, name: path, type: "deleted" });
         }
       }
@@ -830,7 +848,9 @@ export class DriveSyncManager {
       // 9. Handle locally deleted files: move to trash/ subfolder on Drive
       // - localOnly: files in localMeta but not remoteMeta (deleted locally before ever syncing remote)
       // - deletedIds: files in both metas but physically deleted from disk
-      const filesToTrash = [
+      // Verify with adapter.exists to avoid trashing files that exist on disk
+      // but are temporarily missing from Obsidian's index
+      const candidateTrash = [
         ...diff.localOnly.filter(id => {
           if (renamedFileIds.has(id)) return false;
           const path = idToPath[id];
@@ -838,6 +858,13 @@ export class DriveSyncManager {
         }),
         ...deletedIds,
       ];
+      const filesToTrash: string[] = [];
+      for (const id of candidateTrash) {
+        const path = idToPath[id];
+        if (path && !(await this.app.vault.adapter.exists(path))) {
+          filesToTrash.push(id);
+        }
+      }
       if (filesToTrash.length > 0) {
         const trashFolderId = await drive.ensureSubFolder(accessToken, rootFolderId, "trash");
         for (const fileId of filesToTrash) {
@@ -1022,7 +1049,7 @@ export class DriveSyncManager {
   // Pull
   // ========================================
 
-  async pull(): Promise<void> {
+  async pull(ignoredIds?: Set<string>): Promise<void> {
     if (this.syncLock) {
       console.warn("[DriveSync] pull skipped: sync already in progress");
       return;
@@ -1105,10 +1132,11 @@ export class DriveSyncManager {
       }
 
       // 5. Process the diff
-      await this.applyPullDiff(accessToken, rootFolderId, localMeta, remoteMeta, diff);
+      await this.applyPullDiff(accessToken, rootFolderId, localMeta, remoteMeta, diff, ignoredIds);
 
       this.syncStatus = "idle";
-      const pullCount = diff.toPull.length + diff.remoteOnly.length;
+      const ignoredCount = ignoredIds?.size ?? 0;
+      const pullCount = diff.toPull.length + diff.remoteOnly.length - ignoredCount;
       const deleteCount = diff.localOnly.length;
       const parts: string[] = [];
       if (pullCount > 0) parts.push(`pulled ${pullCount}`);
@@ -1136,7 +1164,8 @@ export class DriveSyncManager {
     rootFolderId: string,
     localMeta: LocalDriveSyncMeta,
     remoteMeta: SyncMeta,
-    diff: SyncDiff
+    diff: SyncDiff,
+    ignoredIds?: Set<string>
   ): Promise<void> {
     const idToPath = buildIdToPathMap(localMeta);
     const historyManager = getEditHistoryManager();
@@ -1160,7 +1189,9 @@ export class DriveSyncManager {
     }
 
     // 2. Handle remote renames: remove old local file before downloading to new path
+    //    Skip ignored files — they keep local content at the original path
     for (const fileId of diff.toPull) {
+      if (ignoredIds?.has(fileId)) continue;
       const oldPath = idToPath[fileId];
       const remotePath = remoteMeta.files[fileId]?.path || remoteMeta.files[fileId]?.name;
       if (oldPath && remotePath && oldPath !== remotePath) {
@@ -1176,8 +1207,9 @@ export class DriveSyncManager {
       }
     }
 
-    // 2b. Download toPull + remoteOnly files
-    const filesToPull = [...diff.toPull, ...diff.remoteOnly];
+    // 2b. Download toPull + remoteOnly files (excluding ignored)
+    const allFilesToPull = [...diff.toPull, ...diff.remoteOnly];
+    const filesToPull = ignoredIds?.size ? allFilesToPull.filter(id => !ignoredIds.has(id)) : allFilesToPull;
 
     for (let i = 0; i < filesToPull.length; i += CONCURRENCY) {
       const batch = filesToPull.slice(i, i + CONCURRENCY);
@@ -1238,35 +1270,49 @@ export class DriveSyncManager {
     // Note: getAbstractFileByPath may return null even when the file exists on disk
     // (e.g., during concurrent batch downloads, or if Obsidian's index hasn't caught up).
     // Fall back to adapter.exists + modify if vault.create throws.
+    // On case-insensitive filesystems (NTFS, macOS), the actual vault path may
+    // differ in case from the remote path (e.g., "Articles/" vs "articles/").
+    // Capture the actual TFile path from write operations for correct metadata.
+    let actualPath = vaultPath;
     const existingFile = this.app.vault.getAbstractFileByPath(vaultPath);
     if (isBinary) {
       const content = await drive.readFileRaw(accessToken, fileId);
       if (existingFile instanceof TFile) {
         await this.app.vault.modifyBinary(existingFile, content);
+        actualPath = existingFile.path;
       } else {
         try {
-          await this.app.vault.createBinary(vaultPath, content);
+          const created = await this.app.vault.createBinary(vaultPath, content);
+          actualPath = created.path;
         } catch {
           // File may already exist on disk; fall back to adapter write
           await this.app.vault.adapter.writeBinary(vaultPath, content);
+          // On case-insensitive FS, the actual path may differ from vaultPath
+          const found = this.app.vault.getAbstractFileByPath(vaultPath);
+          if (found instanceof TFile) actualPath = found.path;
         }
       }
     } else {
       const content = await drive.readFile(accessToken, fileId);
       if (existingFile instanceof TFile) {
         await this.app.vault.modify(existingFile, content);
+        actualPath = existingFile.path;
       } else {
         try {
-          await this.app.vault.create(vaultPath, content);
+          const created = await this.app.vault.create(vaultPath, content);
+          actualPath = created.path;
         } catch {
           // File may already exist on disk; fall back to adapter write
           await this.app.vault.adapter.write(vaultPath, content);
+          // On case-insensitive FS, the actual path may differ from vaultPath
+          const found = this.app.vault.getAbstractFileByPath(vaultPath);
+          if (found instanceof TFile) actualPath = found.path;
         }
       }
     }
 
-    // Update local meta
-    localMeta.pathToId[vaultPath] = fileId;
+    // Update local meta using actual vault path (may differ from remote path on case-insensitive FS)
+    localMeta.pathToId[actualPath] = fileId;
     localMeta.files[fileId] = {
       md5Checksum: fileMeta.md5Checksum,
       modifiedTime: fileMeta.modifiedTime,
@@ -1275,18 +1321,21 @@ export class DriveSyncManager {
 
   /**
    * Ensure a folder path exists in the Vault.
+   * Uses vault.createFolder to register directories in Obsidian's index,
+   * which prevents vault.create from failing for files in new directories.
    */
   private async ensureVaultFolder(folderPath: string): Promise<void> {
     const parts = folderPath.split("/").filter(Boolean);
     let current = "";
     for (const part of parts) {
       current = current ? `${current}/${part}` : part;
-      const exists = await this.app.vault.adapter.exists(current);
-      if (!exists) {
+      if (!this.app.vault.getAbstractFileByPath(current)) {
         try {
-          await this.app.vault.adapter.mkdir(current);
+          await this.app.vault.createFolder(current);
         } catch {
-          // Ignore: concurrent batch may have already created the directory
+          // Folder may already exist on disk (concurrent creation);
+          // ensure it exists at minimum via adapter
+          try { await this.app.vault.adapter.mkdir(current); } catch { /* ignore */ }
         }
       }
     }
@@ -1337,7 +1386,21 @@ export class DriveSyncManager {
         }));
       }
 
-      // Delete vault files not in remote (use newLocalMeta.pathToId populated by downloadFile)
+      // Reconcile pathToId with actual vault paths (case-insensitive FS support).
+      // On NTFS/macOS, remote path "articles/x.md" is written to "Articles/x.md"
+      // but pathToId may store the remote-case path. Build a lookup to reconcile.
+      const vaultPathsByLower = new Map<string, string>();
+      for (const f of this.getAllVaultFiles()) {
+        vaultPathsByLower.set(f.path.toLowerCase(), f.path);
+      }
+      const reconciledPathToId: Record<string, string> = {};
+      for (const [path, id] of Object.entries(newLocalMeta.pathToId)) {
+        const actualPath = vaultPathsByLower.get(path.toLowerCase()) ?? path;
+        reconciledPathToId[actualPath] = id;
+      }
+      newLocalMeta.pathToId = reconciledPathToId;
+
+      // Delete vault files not in remote
       const vaultFiles = this.getAllVaultFiles();
       for (const file of vaultFiles) {
         if (!newLocalMeta.pathToId[file.path]) {
@@ -1350,7 +1413,18 @@ export class DriveSyncManager {
       for (const f of this.getAllVaultFiles()) {
         freshVaultStats.set(f.path, { mtime: f.stat.mtime, size: f.stat.size });
       }
-      const updatedLocalMeta = toLocalSyncMeta(remoteMeta, newLocalMeta, freshVaultStats);
+      // Only include files that were actually downloaded in localMeta.
+      // toLocalSyncMeta adds ALL remoteMeta entries, but files that were
+      // skipped (excluded, invalid path, or not indexed by Obsidian) would
+      // appear as false "deleted" items in subsequent push checks.
+      const downloadedIds = new Set(Object.keys(newLocalMeta.files));
+      const filteredRemoteMeta: SyncMeta = {
+        lastUpdatedAt: remoteMeta.lastUpdatedAt,
+        files: Object.fromEntries(
+          Object.entries(remoteMeta.files).filter(([id]) => downloadedIds.has(id))
+        ),
+      };
+      const updatedLocalMeta = toLocalSyncMeta(filteredRemoteMeta, newLocalMeta, freshVaultStats);
       await writeLocalSyncMeta(this.app, this.workspaceFolder, updatedLocalMeta);
 
       // Full pull: clear all edit history
