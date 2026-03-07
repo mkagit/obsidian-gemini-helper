@@ -256,6 +256,8 @@ Certains outils MCP retournent une UI interactive qui permet d'interagir visuell
 - **Instructions personnalisées** - Définissez un comportement spécifique au domaine via des fichiers `SKILL.md`
 - **Documents de référence** - Incluez des guides de style, modèles et listes de contrôle dans `references/`
 - **Intégration des workflows** - Les skills peuvent exposer des workflows comme outils de Function Calling
+- **Commande slash** - Tapez `/folder-name` pour invoquer un skill instantanément et envoyer
+- **Support mode CLI** - Les skills fonctionnent avec les backends Gemini CLI, Claude CLI et Codex CLI
 - **Activation sélective** - Choisissez quels skills sont actifs par conversation
 
 > **Pour les instructions de configuration et des exemples, consultez [SKILLS.md](docs/SKILLS_fr.md)**

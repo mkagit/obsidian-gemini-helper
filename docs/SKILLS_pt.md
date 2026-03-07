@@ -126,6 +126,20 @@ Quando skills estão ativos:
 - Se os skills possuem fluxos de trabalho, a ferramenta `run_skill_workflow` fica disponível
 - A mensagem do assistente mostra quais skills foram utilizados
 
+### Comando Slash
+
+Você pode invocar um skill diretamente digitando `/folder-name` na entrada do chat:
+
+- **`/folder-name`** — Ativa o skill e envia imediatamente. A IA utiliza proativamente as instruções e fluxos de trabalho do skill.
+- **`/folder-name sua mensagem`** — Ativa o skill e envia "sua mensagem" junto.
+- O autocompletar mostra os skills disponíveis ao digitar `/`. Selecionar do autocompletar envia imediatamente.
+
+O nome da pasta (não o nome de exibição do skill) é usado como comando — por exemplo, um skill em `skills/weekly-report/` é invocado com `/weekly-report`.
+
+### Suporte ao Modo CLI
+
+Os skills também funcionam com backends CLI (Gemini CLI, Claude CLI, Codex CLI). Como os provedores CLI não suportam Function Calling, os fluxos de trabalho de skills utilizam uma convenção baseada em texto: a IA emite um marcador `[RUN_WORKFLOW: workflowId]`, e o plugin executa automaticamente o fluxo de trabalho e exibe o resultado.
+
 ### Exemplo: Criando um Skill
 
 1. Crie uma pasta: `skills/summarizer/`

@@ -256,6 +256,8 @@ Extend the AI with custom instructions, reference materials, and executable work
 - **Custom instructions** - Define domain-specific behavior via `SKILL.md` files
 - **Reference materials** - Include style guides, templates, and checklists in `references/`
 - **Workflow integration** - Skills can expose workflows as function calling tools
+- **Slash command** - Type `/folder-name` to instantly invoke a skill and send
+- **CLI mode support** - Skills work with Gemini CLI, Claude CLI, and Codex CLI backends
 - **Selective activation** - Choose which skills are active per conversation
 
 > **For setup instructions and examples, see [SKILLS.md](docs/SKILLS.md)**

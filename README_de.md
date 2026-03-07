@@ -256,6 +256,8 @@ Erweitern Sie die KI mit benutzerdefinierten Anweisungen, Referenzmaterialien un
 - **Benutzerdefinierte Anweisungen** - Definieren Sie domänenspezifisches Verhalten über `SKILL.md`-Dateien
 - **Referenzmaterialien** - Styleguides, Vorlagen und Checklisten in `references/` einbinden
 - **Workflow-Integration** - Skills können Workflows als Function-Calling-Werkzeuge bereitstellen
+- **Slash-Befehl** - Geben Sie `/folder-name` ein, um einen Skill sofort aufzurufen und zu senden
+- **CLI-Modus-Unterstützung** - Skills funktionieren mit Gemini CLI, Claude CLI und Codex CLI Backends
 - **Selektive Aktivierung** - Wählen Sie, welche Skills pro Konversation aktiv sind
 
 > **Für Einrichtungsanleitungen und Beispiele siehe [SKILLS.md](docs/SKILLS_de.md)**

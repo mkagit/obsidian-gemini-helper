@@ -256,6 +256,8 @@ MCP(Model Context Protocol) 서버는 Vault 작업 이외의 AI 기능을 확장
 - **맞춤 지시** - `SKILL.md` 파일로 도메인별 동작 정의
 - **참조 자료** - `references/`에 스타일 가이드, 템플릿, 체크리스트 포함
 - **워크플로우 통합** - 스킬이 워크플로우를 Function Calling 도구로 노출 가능
+- **슬래시 명령어** - `/folder-name`을 입력하여 스킬을 즉시 실행하고 전송
+- **CLI 모드 지원** - Gemini CLI, Claude CLI, Codex CLI 백엔드에서도 스킬 사용 가능
 - **선택적 활성화** - 대화별로 활성화할 스킬 선택
 
 > **설정 방법과 예제는 [SKILLS.md](docs/SKILLS_ko.md)를 참조하세요**

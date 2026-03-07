@@ -126,6 +126,20 @@ Wenn Skills aktiv sind:
 - Wenn Skills Workflows haben, wird das `run_skill_workflow`-Werkzeug verfügbar
 - Die Assistenznachricht zeigt an, welche Skills verwendet wurden
 
+### Slash-Befehl
+
+Sie können einen Skill direkt aufrufen, indem Sie `/folder-name` in die Chat-Eingabe eingeben:
+
+- **`/folder-name`** — Aktiviert den Skill und sendet sofort. Die KI nutzt proaktiv die Anweisungen und Workflows des Skills.
+- **`/folder-name Ihre Nachricht`** — Aktiviert den Skill und sendet „Ihre Nachricht" mit.
+- Die Autovervollständigung zeigt verfügbare Skills an, wenn Sie `/` eingeben. Die Auswahl sendet sofort.
+
+Der Ordnername (nicht der Anzeigename des Skills) wird als Befehl verwendet — z.B. wird ein Skill unter `skills/weekly-report/` mit `/weekly-report` aufgerufen.
+
+### CLI-Modus-Unterstützung
+
+Skills funktionieren auch mit CLI-Backends (Gemini CLI, Claude CLI, Codex CLI). Da CLI-Anbieter kein Function Calling unterstützen, verwenden Skill-Workflows eine textbasierte Konvention: Die KI gibt einen `[RUN_WORKFLOW: workflowId]`-Marker aus, und das Plugin führt den Workflow automatisch aus und zeigt das Ergebnis an.
+
 ### Beispiel: Einen Skill erstellen
 
 1. Erstellen Sie einen Ordner: `skills/summarizer/`

@@ -256,6 +256,8 @@ Estendi le capacità dell'IA con istruzioni personalizzate, materiali di riferim
 - **Istruzioni personalizzate** - Definisci il comportamento specifico del dominio tramite file `SKILL.md`
 - **Materiali di riferimento** - Includi guide di stile, modelli e checklist in `references/`
 - **Integrazione dei workflow** - Gli skill possono esporre workflow come strumenti di Function Calling
+- **Comando slash** - Digita `/folder-name` per invocare uno skill istantaneamente e inviare
+- **Supporto modalità CLI** - Gli skill funzionano con i backend Gemini CLI, Claude CLI e Codex CLI
 - **Attivazione selettiva** - Scegli quali skill sono attivi per conversazione
 
 > **Per le istruzioni di configurazione e gli esempi, consulta [SKILLS.md](docs/SKILLS_it.md)**

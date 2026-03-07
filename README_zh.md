@@ -256,6 +256,8 @@ MCP（Model Context Protocol）服务器提供额外的工具，扩展 AI 在 Va
 - **自定义指令** - 通过 `SKILL.md` 文件定义特定领域的行为
 - **参考资料** - 在 `references/` 中包含风格指南、模板和检查清单
 - **工作流集成** - 技能可以将工作流作为 Function Calling 工具公开
+- **斜杠命令** - 输入 `/folder-name` 即可立即调用技能并发送
+- **CLI 模式支持** - 技能可在 Gemini CLI、Claude CLI 和 Codex CLI 后端中使用
 - **选择性激活** - 按对话选择哪些技能处于活动状态
 
 > **有关设置说明和示例，请参阅 [SKILLS.md](docs/SKILLS_zh.md)**

@@ -126,6 +126,20 @@ nodes:
 - 如果技能包含工作流，`run_skill_workflow` 工具将变为可用
 - 助手消息会显示使用了哪些技能
 
+### 斜杠命令
+
+您可以在聊天输入中输入 `/folder-name` 直接调用技能：
+
+- **`/folder-name`** — 激活技能并立即发送。AI 会主动使用该技能的指令和工作流。
+- **`/folder-name 您的消息`** — 激活技能并同时发送「您的消息」。
+- 输入 `/` 时自动补全会显示可用技能。从自动补全中选择后立即发送。
+
+命令使用文件夹名称（而非技能的显示名称）— 例如，位于 `skills/weekly-report/` 的技能通过 `/weekly-report` 调用。
+
+### CLI 模式支持
+
+技能也可在 CLI 后端（Gemini CLI、Claude CLI、Codex CLI）中使用。由于 CLI 提供程序不支持 Function Calling，技能工作流使用基于文本的约定：AI 输出 `[RUN_WORKFLOW: workflowId]` 标记，插件会自动执行工作流并显示结果。
+
 ### 示例：创建技能
 
 1. 创建文件夹：`skills/summarizer/`
