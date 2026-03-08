@@ -4105,6 +4105,20 @@
   font-weight: 500;
 }
 
+/* Settings collapsible details */
+.gemini-helper-settings-summary {
+  cursor: pointer;
+  font-size: var(--h3-size, 1.1em);
+  font-weight: var(--h3-weight, 600);
+  color: var(--h3-color, var(--text-normal));
+  padding: 12px 0 4px;
+  list-style: disclosure-closed;
+}
+
+.gemini-helper-settings-details[open] > .gemini-helper-settings-summary {
+  list-style: disclosure-open;
+}
+
 /* ===============================================
    Vault Tool Button and Menu Styles
    =============================================== */

@@ -9,31 +9,37 @@ export function displayLangfuseSettings(containerEl: HTMLElement, ctx: SettingsC
   const { plugin } = ctx;
   const langfuse = plugin.settings.langfuse ?? { ...DEFAULT_LANGFUSE_SETTINGS };
 
-  new Setting(containerEl).setName(t("settings.langfuse")).setHeading();
-
   if (!isLangfuseAvailable()) {
-    new Setting(containerEl).setDesc(t("settings.langfuseNotAvailable"));
     return;
   }
 
+  new Setting(containerEl).setName(t("settings.langfuse")).setHeading();
+
   // Public key
-  new Setting(containerEl)
+  const publicKeySetting = new Setting(containerEl)
     .setName(t("settings.langfusePublicKey"))
-    .setDesc(t("settings.langfusePublicKey.desc"))
-    .addText((text) =>
-      text
-        .setPlaceholder(t("settings.langfusePublicKey.placeholder"))
-        .setValue(langfuse.publicKey)
-        .onChange((value) => {
-          void (async () => {
-            plugin.settings.langfuse = { ...plugin.settings.langfuse, publicKey: value };
-            await plugin.saveSettings();
-          })();
-        })
-    );
+    .setDesc(t("settings.langfusePublicKey.desc"));
+
+  // Detail settings container — only shown when public key is set
+  const detailContainer = containerEl.createDiv();
+  const isConfigured = !!langfuse.publicKey;
+  detailContainer.style.display = isConfigured ? "" : "none";
+
+  publicKeySetting.addText((text) =>
+    text
+      .setPlaceholder(t("settings.langfusePublicKey.placeholder"))
+      .setValue(langfuse.publicKey)
+      .onChange((value) => {
+        void (async () => {
+          plugin.settings.langfuse = { ...plugin.settings.langfuse, publicKey: value };
+          await plugin.saveSettings();
+          detailContainer.style.display = value ? "" : "none";
+        })();
+      })
+  );
 
   // Secret key (with visibility toggle)
-  const secretKeySetting = new Setting(containerEl)
+  const secretKeySetting = new Setting(detailContainer)
     .setName(t("settings.langfuseSecretKey"))
     .setDesc(t("settings.langfuseSecretKey.desc"));
 
@@ -64,7 +70,7 @@ export function displayLangfuseSettings(containerEl: HTMLElement, ctx: SettingsC
   );
 
   // Base URL
-  new Setting(containerEl)
+  new Setting(detailContainer)
     .setName(t("settings.langfuseBaseUrl"))
     .setDesc(t("settings.langfuseBaseUrl.desc"))
     .addText((text) =>
@@ -83,7 +89,7 @@ export function displayLangfuseSettings(containerEl: HTMLElement, ctx: SettingsC
     );
 
   // Log prompts toggle
-  new Setting(containerEl)
+  new Setting(detailContainer)
     .setName(t("settings.langfuseLogPrompts"))
     .setDesc(t("settings.langfuseLogPrompts.desc"))
     .addToggle((toggle) =>
@@ -96,7 +102,7 @@ export function displayLangfuseSettings(containerEl: HTMLElement, ctx: SettingsC
     );
 
   // Log responses toggle
-  new Setting(containerEl)
+  new Setting(detailContainer)
     .setName(t("settings.langfuseLogResponses"))
     .setDesc(t("settings.langfuseLogResponses.desc"))
     .addToggle((toggle) =>
@@ -109,7 +115,7 @@ export function displayLangfuseSettings(containerEl: HTMLElement, ctx: SettingsC
     );
 
   // Test connection button
-  new Setting(containerEl)
+  new Setting(detailContainer)
     .setName(t("settings.langfuseTestConnection"))
     .setDesc(t("settings.langfuseTestConnection.desc"))
     .addButton((button) =>
