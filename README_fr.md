@@ -9,7 +9,7 @@ Assistant IA **gratuit et open-source** pour Obsidian avec **Chat**, **Automatis
 ## Points Forts
 
 - **Chat IA** - Réponses en streaming, pièces jointes, opérations sur le coffre, commandes slash
-- **Constructeur de Workflows** - Automatisez des tâches multi-étapes avec l'éditeur visuel de nœuds et 23 types de nœuds
+- **Constructeur de Workflows** - Automatisez des tâches multi-étapes avec l'éditeur visuel de nœuds et 24 types de nœuds
 - **Historique d'Édition** - Suivez et restaurez les modifications faites par l'IA avec vue des différences
 - **RAG** - Génération Augmentée par Récupération pour une recherche intelligente dans votre coffre
 - **Recherche Web** - Accédez à des informations actualisées via Google Search
@@ -104,6 +104,7 @@ L'IA peut interagir avec votre coffre en utilisant ces outils :
 | `list_folders` | Lister les dossiers dans le coffre |
 | `get_active_note_info` | Obtenir des infos sur la note active |
 | `get_rag_sync_status` | Vérifier le statut de synchronisation RAG |
+| `bulk_propose_rename` | Renommage en masse de plusieurs fichiers avec dialogue de sélection |
 
 ### Mode Outils du Coffre
 
@@ -260,6 +261,8 @@ Certains outils MCP retournent une UI interactive qui permet d'interagir visuell
 - **Support mode CLI** - Les skills fonctionnent avec les backends Gemini CLI, Claude CLI et Codex CLI
 - **Activation sélective** - Choisissez quels skills sont actifs par conversation
 
+Créez des skills de la même manière que les workflows — sélectionnez **+ New (AI)**, cochez **« Créer en tant qu'agent skill »** et décrivez ce que vous souhaitez. L'AI génère à la fois les instructions du `SKILL.md` et le workflow.
+
 > **Pour les instructions de configuration et des exemples, consultez [SKILLS.md](docs/SKILLS_fr.md)**
 
 ---
@@ -270,14 +273,15 @@ Construisez des workflows automatisés multi-étapes directement dans les fichie
 
 ![Éditeur Visuel de Workflow](docs/images/visual_workflow.png)
 
-## Création de Workflows Assistée par IA
+## Création de Workflows et Skills avec l'AI
 
 **Vous n'avez pas besoin d'apprendre la syntaxe YAML ou les types de nœuds.** Décrivez simplement votre workflow en langage courant :
 
 1. Ouvrez l'onglet **Workflow** dans la barre latérale Gemini
 2. Sélectionnez **+ Nouveau (IA)** dans le menu déroulant
 3. Décrivez ce que vous voulez : *"Créer un workflow qui résume la note sélectionnée et l'enregistre dans un dossier summaries"*
-4. Cliquez sur **Générer** - l'IA crée le workflow complet
+4. Cochez **« Créer en tant qu'agent skill »** si vous souhaitez créer un agent skill au lieu d'un workflow autonome
+5. Cliquez sur **Générer** - l'IA crée le workflow complet
 
 ![Créer un Workflow avec l'IA](docs/images/create_workflow_with_ai.png)
 
@@ -318,14 +322,14 @@ Ouvrez l'onglet **Workflow** dans la barre latérale Gemini pour l'exécuter.
 
 ## Types de Nœuds Disponibles
 
-23 types de nœuds sont disponibles pour construire des workflows :
+24 types de nœuds sont disponibles pour construire des workflows :
 
 | Catégorie | Nœuds |
 |-----------|-------|
 | Variables | `variable`, `set` |
 | Contrôle | `if`, `while` |
 | LLM | `command` |
-| Données | `http`, `json` |
+| Données | `http`, `json`, `script` |
 | Notes | `note`, `note-read`, `note-search`, `note-list`, `folder-list`, `open` |
 | Fichiers | `file-explorer`, `file-save` |
 | Prompts | `prompt-file`, `prompt-selection`, `dialog` |
@@ -400,16 +404,15 @@ Les workflows peuvent être automatiquement déclenchés par des événements Ob
 | Modèle | Description |
 |--------|-------------|
 | Gemini 3.1 Pro Preview | Dernier modèle phare, contexte 1M (recommandé) |
-| Gemini 3.1 Pro Preview (Custom Tools) | Optimisé pour les workflows agentiques avec outils personnalisés et bash |
+| Gemini 3.1 Pro Preview (Custom Tools) | Optimisé pour les flux de travail agentiques avec outils personnalisés et bash |
 | Gemini 3 Flash Preview | Modèle rapide, contexte 1M, meilleur rapport coût-performance |
-| Gemini 3 Pro Preview | Modèle phare, contexte 1M |
+| Gemini 3.1 Flash Lite Preview | Modèle le plus rentable avec hautes performances |
 | Gemini 2.5 Flash | Modèle rapide, contexte 1M |
 | Gemini 2.5 Pro | Modèle Pro, contexte 1M |
-| Gemini 2.5 Flash Lite | Modèle flash léger |
-| Gemini 2.5 Flash (Image) | Génération d'images, 1024px |
 | Gemini 3 Pro (Image) | Génération d'images Pro, 4K |
+| Gemini 3.1 Flash (Image) | Génération d'images rapide et économique |
 
-> **Mode Thinking :** Dans le chat, le mode thinking est déclenché par des mots-clés comme « réfléchis », « analyse » ou « considère » dans votre message. Cependant, **Gemini 3 Pro** et **Gemini 3.1 Pro** utilisent toujours le mode thinking indépendamment des mots-clés — ces modèles ne permettent pas de désactiver le thinking.
+> **Mode Thinking :** Dans le chat, le mode thinking est déclenché par des mots-clés comme « réfléchis », « analyse » ou « considère » dans votre message. Cependant, **Gemini 3.1 Pro** utilise toujours le mode thinking indépendamment des mots-clés — ce modèle ne permet pas de désactiver le thinking.
 
 **Bascule Always Think :**
 
@@ -426,8 +429,8 @@ Quand une bascule est ON, le thinking est toujours actif pour cette famille de m
 | Modèle | Opérations sur le Coffre |
 |--------|--------------------------|
 | Gemini 2.5 Flash | ✅ |
-| Gemini 2.5 Flash Lite | ✅ |
 | Gemini 3 Flash Preview | ✅ |
+| Gemini 3.1 Flash Lite Preview | ✅ |
 | Gemma 3 (27B/12B/4B/1B) | ❌ |
 
 ## Installation

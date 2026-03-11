@@ -9,7 +9,7 @@ Google Gemini 기반의 **Chat**, **Workflow 자동화**, **RAG** 기능을 제�
 ## 주요 기능
 
 - **AI Chat** - 스트리밍 응답, 파일 첨부, vault 작업, 슬래시 명령어
-- **Workflow Builder** - 비주얼 노드 편집기와 23개 노드 유형으로 다단계 작업 자동화
+- **Workflow Builder** - 비주얼 노드 편집기와 24개 노드 유형으로 다단계 작업 자동화
 - **Edit History** - AI가 만든 변경 사항을 diff 뷰로 추적하고 복원
 - **RAG** - vault 전체에서 지능적 검색을 위한 검색 증강 생성
 - **Web Search** - Google Search를 통한 최신 정보 접근
@@ -104,6 +104,7 @@ AI는 다음 도구를 사용하여 vault와 상호작용할 수 있습니다:
 | `list_folders` | vault 내 폴더 목록 |
 | `get_active_note_info` | 활성 노트 정보 가져오기 |
 | `get_rag_sync_status` | RAG 동기화 상태 확인 |
+| `bulk_propose_rename` | 선택 대화상자를 사용한 여러 파일 일괄 이름 변경 |
 
 ### Vault 도구 모드
 
@@ -260,6 +261,8 @@ MCP(Model Context Protocol) 서버는 Vault 작업 이외의 AI 기능을 확장
 - **CLI 모드 지원** - Gemini CLI, Claude CLI, Codex CLI 백엔드에서도 스킬 사용 가능
 - **선택적 활성화** - 대화별로 활성화할 스킬 선택
 
+스킬도 워크플로우와 같은 방법으로 만들 수 있습니다 — **+ New (AI)**를 선택하고, **"에이전트 스킬로 만들기"**를 체크한 후 설명을 입력하세요. AI가 `SKILL.md` 지침과 워크플로우를 모두 생성합니다.
+
 > **설정 방법과 예제는 [SKILLS.md](docs/SKILLS_ko.md)를 참조하세요**
 
 ---
@@ -270,14 +273,15 @@ Markdown 파일에서 직접 자동화된 다단계 워크플로우를 구축합
 
 ![Visual Workflow Editor](docs/images/visual_workflow.png)
 
-## AI 기반 워크플로우 생성
+## AI 기반 워크플로우 & 스킬 생성
 
 **YAML 문법이나 노드 유형을 배울 필요가 없습니다.** 일반 언어로 워크플로우를 설명하기만 하면 됩니다:
 
 1. Gemini 사이드바에서 **Workflow** 탭 열기
 2. 드롭다운에서 **+ New (AI)** 선택
 3. 원하는 것을 설명: *"선택한 노트를 요약하고 summaries 폴더에 저장하는 워크플로우 만들어줘"*
-4. **Generate** 클릭 - AI가 완전한 워크플로우 생성
+4. 독립 워크플로우 대신 에이전트 스킬을 만들려면 **"에이전트 스킬로 만들기"**를 체크
+5. **Generate** 클릭 - AI가 완전한 워크플로우 생성
 
 ![Create Workflow with AI](docs/images/create_workflow_with_ai.png)
 
@@ -318,14 +322,14 @@ Gemini 사이드바에서 **Workflow** 탭을 열어 실행하세요.
 
 ## 사용 가능한 노드 유형
 
-워크플로우 구축에 23개 노드 유형을 사용할 수 있습니다:
+워크플로우 구축에 24개 노드 유형을 사용할 수 있습니다:
 
 | 카테고리 | 노드 |
 |----------|-------|
 | 변수 | `variable`, `set` |
 | 제어 | `if`, `while` |
 | LLM | `command` |
-| 데이터 | `http`, `json` |
+| 데이터 | `http`, `json`, `script` |
 | 노트 | `note`, `note-read`, `note-search`, `note-list`, `folder-list`, `open` |
 | 파일 | `file-explorer`, `file-save` |
 | 프롬프트 | `prompt-file`, `prompt-selection`, `dialog` |
@@ -400,16 +404,15 @@ Obsidian 이벤트에 의해 워크플로우가 자동으로 트리거될 수 �
 | 모델 | 설명 |
 |-------|-------------|
 | Gemini 3.1 Pro Preview | 최신 플래그십 모델, 1M 컨텍스트 (권장) |
-| Gemini 3.1 Pro Preview (Custom Tools) | 커스텀 도구와 bash를 활용한 에이전틱 워크플로에 최적화 |
+| Gemini 3.1 Pro Preview (Custom Tools) | 커스텀 도구와 bash를 사용한 에이전트 워크플로우에 최적화 |
 | Gemini 3 Flash Preview | 빠른 모델, 1M 컨텍스트, 최고의 비용 대비 성능 |
-| Gemini 3 Pro Preview | 플래그십 모델, 1M 컨텍스트 |
+| Gemini 3.1 Flash Lite Preview | 높은 성능의 가장 비용 효율적인 모델 |
 | Gemini 2.5 Flash | 빠른 모델, 1M 컨텍스트 |
 | Gemini 2.5 Pro | Pro 모델, 1M 컨텍스트 |
-| Gemini 2.5 Flash Lite | 경량 flash 모델 |
-| Gemini 2.5 Flash (Image) | 이미지 생성, 1024px |
 | Gemini 3 Pro (Image) | Pro 이미지 생성, 4K |
+| Gemini 3.1 Flash (Image) | 빠르고 저렴한 이미지 생성 |
 
-> **Thinking 모드:** 채팅에서는 메시지에 "생각해", "분석해", "고려해" 같은 키워드가 포함되면 Thinking 모드가 활성화됩니다. 그러나 **Gemini 3 Pro**와 **Gemini 3.1 Pro**는 키워드와 관계없이 항상 Thinking 모드로 작동합니다 — 이 모델들은 Thinking 비활성화를 지원하지 않습니다.
+> **Thinking 모드:** 채팅에서는 메시지에 "생각해", "분석해", "고려해" 같은 키워드가 포함되면 Thinking 모드가 활성화됩니다. 그러나 **Gemini 3.1 Pro**는 키워드와 관계없이 항상 Thinking 모드로 작동합니다 — 이 모델은 Thinking 비활성화를 지원하지 않습니다.
 
 **Always Think 토글:**
 
@@ -428,6 +431,7 @@ Obsidian 이벤트에 의해 워크플로우가 자동으로 트리거될 수 �
 | Gemini 2.5 Flash | ✅ |
 | Gemini 2.5 Flash Lite | ✅ |
 | Gemini 3 Flash Preview | ✅ |
+| Gemini 3.1 Flash Lite Preview | ✅ |
 | Gemma 3 (27B/12B/4B/1B) | ❌ |
 
 ## 설치

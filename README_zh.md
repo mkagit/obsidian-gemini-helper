@@ -9,7 +9,7 @@
 ## 主要特性
 
 - **AI 聊天** - 流式响应、文件附件、仓库操作、斜杠命令
-- **工作流构建器** - 使用可视化节点编辑器和 23 种节点类型自动化多步骤任务
+- **工作流构建器** - 使用可视化节点编辑器和 24 种节点类型自动化多步骤任务
 - **编辑历史** - 使用差异视图追踪和恢复 AI 所做的更改
 - **RAG** - 检索增强生成，在您的仓库中进行智能搜索
 - **网页搜索** - 通过 Google 搜索获取最新信息
@@ -104,6 +104,7 @@ AI 可以使用以下工具与您的仓库交互：
 | `list_folders` | 列出仓库中的文件夹 |
 | `get_active_note_info` | 获取当前笔记的信息 |
 | `get_rag_sync_status` | 检查 RAG 同步状态 |
+| `bulk_propose_rename` | 通过选择对话框批量重命名多个文件 |
 
 ### Vault 工具模式
 
@@ -260,6 +261,8 @@ MCP（Model Context Protocol）服务器提供额外的工具，扩展 AI 在 Va
 - **CLI 模式支持** - 技能可在 Gemini CLI、Claude CLI 和 Codex CLI 后端中使用
 - **选择性激活** - 按对话选择哪些技能处于活动状态
 
+创建技能的方式与工作流相同 — 选择 **+ New (AI)**，勾选 **"作为代理技能创建"**，然后描述您想要的功能。AI 会同时生成 `SKILL.md` 指令和工作流。
+
 > **有关设置说明和示例，请参阅 [SKILLS.md](docs/SKILLS_zh.md)**
 
 ---
@@ -270,14 +273,15 @@ MCP（Model Context Protocol）服务器提供额外的工具，扩展 AI 在 Va
 
 ![可视化工作流编辑器](docs/images/visual_workflow.png)
 
-## AI 驱动的工作流创建
+## AI 驱动的工作流和技能创建
 
 **您不需要学习 YAML 语法或节点类型。** 只需用自然语言描述您的工作流：
 
 1. 在 Gemini 侧边栏中打开**工作流**标签
 2. 从下拉菜单中选择 **+ New (AI)**
 3. 描述您想要的内容：*"创建一个工作流，总结选中的笔记并保存到 summaries 文件夹"*
-4. 点击**生成** - AI 会创建完整的工作流
+4. 如果要创建代理技能而非独立工作流，请勾选 **"作为代理技能创建"**
+5. 点击**生成** - AI 会创建完整的工作流
 
 ![使用 AI 创建工作流](docs/images/create_workflow_with_ai.png)
 
@@ -318,14 +322,14 @@ nodes:
 
 ## 可用节点类型
 
-23 种节点类型可用于构建工作流：
+24 种节点类型可用于构建工作流：
 
 | 类别 | 节点 |
 |----------|-------|
 | 变量 | `variable`, `set` |
 | 控制 | `if`, `while` |
 | LLM | `command` |
-| 数据 | `http`, `json` |
+| 数据 | `http`, `json`, `script` |
 | 笔记 | `note`, `note-read`, `note-search`, `note-list`, `folder-list`, `open` |
 | 文件 | `file-explorer`, `file-save` |
 | 提示 | `prompt-file`, `prompt-selection`, `dialog` |
@@ -400,16 +404,15 @@ nodes:
 | 模型 | 描述 |
 |-------|-------------|
 | Gemini 3.1 Pro Preview | 最新旗舰模型，1M 上下文（推荐） |
-| Gemini 3.1 Pro Preview (Custom Tools) | 针对自定义工具和 bash 的智能体工作流优化 |
+| Gemini 3.1 Pro Preview (Custom Tools) | 针对自定义工具和 bash 的代理工作流优化 |
 | Gemini 3 Flash Preview | 快速模型，1M 上下文，最佳性价比 |
-| Gemini 3 Pro Preview | 旗舰模型，1M 上下文 |
+| Gemini 3.1 Flash Lite Preview | 最具成本效益的高性能模型 |
 | Gemini 2.5 Flash | 快速模型，1M 上下文 |
 | Gemini 2.5 Pro | Pro 模型，1M 上下文 |
-| Gemini 2.5 Flash Lite | 轻量级 flash 模型 |
-| Gemini 2.5 Flash (Image) | 图像生成，1024px |
 | Gemini 3 Pro (Image) | Pro 图像生成，4K |
+| Gemini 3.1 Flash (Image) | 快速、低成本图像生成 |
 
-> **Thinking 模式：** 在聊天中，当消息包含"思考"、"分析一下"或"考虑"等关键词时会触发 Thinking 模式。但是，**Gemini 3 Pro** 和 **Gemini 3.1 Pro** 无论是否包含关键词都始终使用 Thinking 模式——这些模型不支持禁用 Thinking。
+> **Thinking 模式：** 在聊天中，当消息包含"思考"、"分析一下"或"考虑"等关键词时会触发 Thinking 模式。但是，**Gemini 3.1 Pro** 无论是否包含关键词都始终使用 Thinking 模式——这些模型不支持禁用 Thinking。
 
 **Always Think 开关：**
 
@@ -428,6 +431,7 @@ nodes:
 | Gemini 2.5 Flash | ✅ |
 | Gemini 2.5 Flash Lite | ✅ |
 | Gemini 3 Flash Preview | ✅ |
+| Gemini 3.1 Flash Lite Preview | ✅ |
 | Gemma 3 (27B/12B/4B/1B) | ❌ |
 
 ## 安装

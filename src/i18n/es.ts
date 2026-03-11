@@ -56,10 +56,6 @@ export const es: Record<string, string> = {
   "settings.cliPathCleared": "Ruta CLI borrada",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "Carpeta del espacio de trabajo",
-  "settings.workspaceFolder.desc": "Carpeta para almacenar historiales de chat y configuraciones de búsqueda semántica",
-  "settings.workspaceFolder.vaultRoot": "Raíz del vault",
-  "settings.workspaceFolder.willBeCreated": "{{folder}} (se creará)",
   "settings.hideWorkspaceFolder": "Ocultar carpeta del espacio de trabajo",
   "settings.hideWorkspaceFolder.desc": "Ocultar la carpeta del espacio de trabajo del explorador de archivos",
   "settings.saveChatHistory": "Guardar historial de chat",
@@ -210,6 +206,8 @@ export const es: Record<string, string> = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "Guardar como nota",
+  "chat.savedAsNote": "Guardado como {{path}}",
   "chat.newChat": "Nuevo chat",
   "chat.chatHistory": "Historial de chat",
   "chat.noChatHistory": "Aún no hay historial de chat",
@@ -378,7 +376,7 @@ export const es: Record<string, string> = {
   "workflow.noWorkflowInFile": "No se encontró flujo de trabajo en este archivo.",
   "workflow.createWithAI": "Crear flujo de trabajo con IA",
   "workflow.noWorkflows": "Sin flujos de trabajo",
-  "workflow.newAI": "+ Nuevo (IA)",
+  "workflow.newAI": "+ nuevo Workflow / Skill (AI)",
   "workflow.browseAllWorkflows": "Explorar todos los workflows...",
   "workflow.reloadFromFile": "Recargar desde archivo",
   "workflow.addNode": "Agregar nodo",
@@ -727,10 +725,6 @@ export const es: Record<string, string> = {
   "input.mcpToolHint": "({{count}} herramientas: {{tools}})",
 
   // Skills Settings
-  "settings.skills": "Skills de agente",
-  "settings.skillsFolder": "Carpeta de skills",
-  "settings.skillsFolder.desc": "Ruta relativa a la carpeta de skills de agente. Cada subcarpeta con un archivo skill.md se trata como un skill.",
-  "settings.skillsFolder.placeholder": "Skills",
 
   // Skills UI
   "skills.add": "Agregar skill",
@@ -753,11 +747,11 @@ export const es: Record<string, string> = {
   "aiWorkflow.outputPath": "Ruta de salida:",
   "aiWorkflow.currentWorkflow": "Flujo de trabajo actual",
   "aiWorkflow.model": "Modelo:",
-  "aiWorkflow.createTitle": "Crear flujo de trabajo con IA",
+  "aiWorkflow.createTitle": "Crear Workflow / Skill con AI",
   "aiWorkflow.modifyTitle": "Modificar flujo de trabajo con IA",
-  "aiWorkflow.describeCreate": "Describe qué debe hacer este flujo de trabajo:",
+  "aiWorkflow.describeCreate": "Describe el workflow o skill que deseas crear:",
   "aiWorkflow.describeModify": "Describe las modificaciones que deseas:",
-  "aiWorkflow.placeholderCreate": "ej., Crear un flujo de trabajo que lea una nota, la resuma con IA y guarde el resumen en un nuevo archivo",
+  "aiWorkflow.placeholderCreate": "Ej., Resumir la nota actual y guardar en un archivo de resumen\nPara skills, marque \"Crear como agent skill\" abajo",
   "aiWorkflow.placeholderModify": "ej., Agregar un diálogo de confirmación antes de escribir el archivo",
   "aiWorkflow.mentionHint": "Consejo: escribe @ para insertar referencias de archivos. El contenido del archivo se incrustará al generar.",
   "aiWorkflow.namePlaceholder": "Mi flujo de trabajo",

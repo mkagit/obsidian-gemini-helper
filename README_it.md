@@ -9,7 +9,7 @@ Assistente AI **gratuito e open-source** per Obsidian con **Chat**, **Automazion
 ## Caratteristiche Principali
 
 - **Chat AI** - Risposte in streaming, allegati, operazioni sul vault, comandi slash
-- **Workflow Builder** - Automatizza attività multi-step con editor visuale e 23 tipi di nodi
+- **Workflow Builder** - Automatizza attività multi-step con editor visuale e 24 tipi di nodi
 - **Cronologia Modifiche** - Traccia e ripristina le modifiche fatte dall'AI con vista diff
 - **RAG** - Retrieval-Augmented Generation per ricerca intelligente nel tuo vault
 - **Ricerca Web** - Accedi a informazioni aggiornate tramite Google Search
@@ -104,6 +104,7 @@ L'AI può interagire con il tuo vault usando questi strumenti:
 | `list_folders` | Elenca le cartelle nel vault |
 | `get_active_note_info` | Ottiene informazioni sulla nota attiva |
 | `get_rag_sync_status` | Controlla lo stato della sincronizzazione RAG |
+| `bulk_propose_rename` | Rinomina in massa di più file con finestra di selezione |
 
 ### Modalità Strumenti Vault
 
@@ -260,6 +261,8 @@ Estendi le capacità dell'IA con istruzioni personalizzate, materiali di riferim
 - **Supporto modalità CLI** - Gli skill funzionano con i backend Gemini CLI, Claude CLI e Codex CLI
 - **Attivazione selettiva** - Scegli quali skill sono attivi per conversazione
 
+Crea gli skill allo stesso modo dei workflow — seleziona **+ New (AI)**, attiva **"Crea come agent skill"** e descrivi cosa vuoi. L'AI genera sia le istruzioni del `SKILL.md` che il workflow.
+
 > **Per le istruzioni di configurazione e gli esempi, consulta [SKILLS.md](docs/SKILLS_it.md)**
 
 ---
@@ -270,14 +273,15 @@ Costruisci workflow automatizzati multi-step direttamente nei file Markdown. **N
 
 ![Editor Visuale dei Workflow](docs/images/visual_workflow.png)
 
-## Creazione di Workflow con AI
+## Creazione di Workflow e Skill con AI
 
 **Non hai bisogno di imparare la sintassi YAML o i tipi di nodo.** Descrivi semplicemente il tuo workflow in linguaggio naturale:
 
 1. Apri la scheda **Workflow** nella sidebar di Gemini
 2. Seleziona **+ New (AI)** dal menu a tendina
 3. Descrivi cosa vuoi: *"Crea un workflow che riassuma la nota selezionata e la salvi in una cartella summaries"*
-4. Clicca **Generate** - l'AI crea il workflow completo
+4. Seleziona **"Crea come agent skill"** se vuoi creare un agent skill invece di un workflow autonomo
+5. Clicca **Generate** - l'AI crea il workflow completo
 
 ![Crea Workflow con AI](docs/images/create_workflow_with_ai.png)
 
@@ -318,14 +322,14 @@ Apri la scheda **Workflow** nella sidebar di Gemini per eseguirlo.
 
 ## Tipi di Nodo Disponibili
 
-23 tipi di nodo sono disponibili per costruire workflow:
+24 tipi di nodo sono disponibili per costruire workflow:
 
 | Categoria | Nodi |
 |-----------|------|
 | Variabili | `variable`, `set` |
 | Controllo | `if`, `while` |
 | LLM | `command` |
-| Dati | `http`, `json` |
+| Dati | `http`, `json`, `script` |
 | Note | `note`, `note-read`, `note-search`, `note-list`, `folder-list`, `open` |
 | File | `file-explorer`, `file-save` |
 | Prompt | `prompt-file`, `prompt-selection`, `dialog` |
@@ -399,17 +403,16 @@ I workflow possono essere attivati automaticamente dagli eventi di Obsidian:
 ### Piano a Pagamento
 | Modello | Descrizione |
 |---------|-------------|
-| Gemini 3.1 Pro Preview | Ultimo modello flagship, contesto 1M (consigliato) |
-| Gemini 3.1 Pro Preview (Custom Tools) | Ottimizzato per workflow agentici con strumenti personalizzati e bash |
+| Gemini 3.1 Pro Preview | Ultimo modello di punta, contesto 1M (consigliato) |
+| Gemini 3.1 Pro Preview (Custom Tools) | Ottimizzato per flussi di lavoro agentici con strumenti personalizzati e bash |
 | Gemini 3 Flash Preview | Modello veloce, contesto 1M, miglior rapporto costo-prestazioni |
-| Gemini 3 Pro Preview | Modello flagship, contesto 1M |
+| Gemini 3.1 Flash Lite Preview | Modello più conveniente con alte prestazioni |
 | Gemini 2.5 Flash | Modello veloce, contesto 1M |
 | Gemini 2.5 Pro | Modello Pro, contesto 1M |
-| Gemini 2.5 Flash Lite | Modello flash leggero |
-| Gemini 2.5 Flash (Image) | Generazione immagini, 1024px |
 | Gemini 3 Pro (Image) | Generazione immagini Pro, 4K |
+| Gemini 3.1 Flash (Image) | Generazione immagini veloce e a basso costo |
 
-> **Modalità Thinking:** Nella chat, la modalità thinking viene attivata da parole chiave come "pensa", "analizza" o "rifletti" nel messaggio. Tuttavia, **Gemini 3 Pro** e **Gemini 3.1 Pro** utilizzano sempre la modalità thinking indipendentemente dalle parole chiave — questi modelli non supportano la disattivazione del thinking.
+> **Modalità Thinking:** Nella chat, la modalità thinking viene attivata da parole chiave come "pensa", "analizza" o "rifletti" nel messaggio. Tuttavia, **Gemini 3.1 Pro** utilizza sempre la modalità thinking indipendentemente dalle parole chiave — questo modello non supporta la disattivazione del thinking.
 
 **Toggle Always Think:**
 
@@ -428,6 +431,7 @@ Quando un toggle è ON, il thinking è sempre attivo per quella famiglia di mode
 | Gemini 2.5 Flash | ✅ |
 | Gemini 2.5 Flash Lite | ✅ |
 | Gemini 3 Flash Preview | ✅ |
+| Gemini 3.1 Flash Lite Preview | ✅ |
 | Gemma 3 (27B/12B/4B/1B) | ❌ |
 
 ## Installazione

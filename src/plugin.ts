@@ -39,6 +39,7 @@ import { EditHistoryModal } from "src/ui/components/EditHistoryModal";
 import { formatError } from "src/utils/error";
 import { DEFAULT_CLI_CONFIG, DEFAULT_EDIT_HISTORY_SETTINGS, DEFAULT_LANGFUSE_SETTINGS, DEFAULT_DRIVE_SYNC_SETTINGS, hasVerifiedCli } from "src/types";
 import { initLocale, t } from "src/i18n";
+import { registerWorkflowCodeBlockProcessor } from "src/ui/workflowCodeBlock";
 import { DriveSyncManager } from "src/core/driveSync";
 
 
@@ -54,9 +55,6 @@ export class GeminiHelperPlugin extends Plugin {
   // Google Drive Sync
   driveSyncManager: DriveSyncManager | null = null;
   private driveSyncUI!: DriveSyncUIManager;
-
-  // Hide workspace folder: tracked elements with toggled CSS class
-  private hiddenWorkspaceFolderEls: HTMLElement[] = [];
 
   // Delegate workspaceState to the manager
   get workspaceState(): WorkspaceState {
@@ -82,6 +80,9 @@ export class GeminiHelperPlugin extends Plugin {
     // Initialize workflow manager
     this.workflowMgr = new WorkflowManager(this);
 
+    // Workflow code block: render as Mermaid diagram (Reading mode + Live Preview)
+    registerWorkflowCodeBlockProcessor(this);
+
     // Initialize workspace state manager
     this.wsManager = new WorkspaceStateManager(
       this.app,
@@ -94,25 +95,14 @@ export class GeminiHelperPlugin extends Plugin {
     // Handle migration data modified event
     this.settingsEmitter.on("migration-data-modified", (data: unknown) => {
       void (async () => {
-        // Update in-memory settings from migrated data before saving
-        const migratedData = data as Record<string, unknown>;
-        if (migratedData.workspaceFolder !== undefined) {
-          this.settings.workspaceFolder = migratedData.workspaceFolder as string;
-        }
         await this.saveData(data);
       })();
     });
 
     // Load settings and workspace state
     void this.loadSettings().then(async () => {
-      // Apply workspace folder visibility (CSS class toggle)
+      // Apply workspace folder visibility (body class toggle)
       this.updateWorkspaceFolderVisibility();
-      // Re-apply when file explorer re-renders (DOM elements get recreated)
-      this.registerEvent(
-        this.app.workspace.on("layout-change", () => {
-          this.updateWorkspaceFolderVisibility();
-        })
-      );
 
       // Migrate from old settings format first (one-time)
       try {
@@ -574,11 +564,8 @@ export class GeminiHelperPlugin extends Plugin {
     this.driveSyncManager?.destroy();
     this.driveSyncManager = null;
 
-    // Clean up hide workspace folder classes
-    for (const el of this.hiddenWorkspaceFolderEls) {
-      el.classList.remove("gemini-helper-workspace-folder-hidden");
-    }
-    this.hiddenWorkspaceFolderEls = [];
+    // Clean up hide workspace folder style element
+    document.getElementById("gemini-helper-hide-workspace-folder-style")?.remove();
 
     // Clean up workflow timers
     this.workflowMgr.cleanup();
@@ -687,38 +674,9 @@ export class GeminiHelperPlugin extends Plugin {
     return this.wsManager.saveWorkspaceState();
   }
 
-  async changeWorkspaceFolder(newFolder: string): Promise<void> {
-    // Manager handles migration, then we update settings
-    await this.wsManager.changeWorkspaceFolder(newFolder);
-    // Update settings after manager completes migration
-    this.settings.workspaceFolder = newFolder;
-    await this.saveSettings();
-    this.updateWorkspaceFolderVisibility();
-  }
-
-  /** Show or hide the workspace folder in the file explorer via CSS class toggle. */
+  /** Show or hide the workspace folder in the file explorer. */
   updateWorkspaceFolderVisibility(): void {
-    // Remove previously applied classes
-    for (const el of this.hiddenWorkspaceFolderEls) {
-      el.classList.remove("gemini-helper-workspace-folder-hidden");
-    }
-    this.hiddenWorkspaceFolderEls = [];
-
-    if (this.settings.hideWorkspaceFolder && this.settings.workspaceFolder) {
-      const folder = this.settings.workspaceFolder;
-      const titleEl = document.querySelector(
-        `.nav-folder-title[data-path="${CSS.escape(folder)}"]`
-      );
-      if (titleEl instanceof HTMLElement) {
-        titleEl.classList.add("gemini-helper-workspace-folder-hidden");
-        this.hiddenWorkspaceFolderEls.push(titleEl);
-        const childrenEl = titleEl.nextElementSibling;
-        if (childrenEl instanceof HTMLElement && childrenEl.classList.contains("nav-folder-children")) {
-          childrenEl.classList.add("gemini-helper-workspace-folder-hidden");
-          this.hiddenWorkspaceFolderEls.push(childrenEl);
-        }
-      }
-    }
+    document.body.toggleClass("gemini-helper-hide-workspace-folder", this.settings.hideWorkspaceFolder);
   }
 
   getSelectedRagSetting(): RagSetting | null {

@@ -56,10 +56,6 @@ export const zh: Record<string, string> = {
   "settings.cliPathCleared": "CLI 路径已清除",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "工作区文件夹",
-  "settings.workspaceFolder.desc": "用于存储聊天记录和语义搜索设置的文件夹",
-  "settings.workspaceFolder.vaultRoot": "库根目录",
-  "settings.workspaceFolder.willBeCreated": "{{folder}}（将被创建）",
   "settings.hideWorkspaceFolder": "隐藏工作区文件夹",
   "settings.hideWorkspaceFolder.desc": "在文件浏览器中隐藏工作区文件夹",
   "settings.saveChatHistory": "保存聊天记录",
@@ -210,6 +206,8 @@ export const zh: Record<string, string> = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "保存为笔记",
+  "chat.savedAsNote": "已保存到 {{path}}",
   "chat.newChat": "新建聊天",
   "chat.chatHistory": "聊天记录",
   "chat.noChatHistory": "暂无聊天记录",
@@ -378,7 +376,7 @@ export const zh: Record<string, string> = {
   "workflow.noWorkflowInFile": "此文件中未找到工作流。",
   "workflow.createWithAI": "使用 AI 创建工作流",
   "workflow.noWorkflows": "无工作流",
-  "workflow.newAI": "+ 新建 (AI)",
+  "workflow.newAI": "+ 新建工作流 / 技能 (AI)",
   "workflow.browseAllWorkflows": "浏览所有工作流...",
   "workflow.reloadFromFile": "从文件重新加载",
   "workflow.addNode": "添加节点",
@@ -727,10 +725,6 @@ export const zh: Record<string, string> = {
   "input.mcpToolHint": "（{{count}} 个工具：{{tools}}）",
 
   // Skills Settings
-  "settings.skills": "代理技能",
-  "settings.skillsFolder": "技能文件夹",
-  "settings.skillsFolder.desc": "代理技能文件夹的相对路径。每个包含 skill.md 文件的子文件夹将被视为一个技能。",
-  "settings.skillsFolder.placeholder": "Skills",
 
   // Skills UI
   "skills.add": "添加技能",
@@ -753,11 +747,11 @@ export const zh: Record<string, string> = {
   "aiWorkflow.outputPath": "输出路径：",
   "aiWorkflow.currentWorkflow": "当前工作流",
   "aiWorkflow.model": "模型：",
-  "aiWorkflow.createTitle": "使用 AI 创建工作流",
+  "aiWorkflow.createTitle": "用 AI 创建工作流 / 技能",
   "aiWorkflow.modifyTitle": "使用 AI 修改工作流",
-  "aiWorkflow.describeCreate": "描述此工作流应执行的操作：",
+  "aiWorkflow.describeCreate": "描述您要创建的工作流或技能：",
   "aiWorkflow.describeModify": "描述您想要的修改：",
-  "aiWorkflow.placeholderCreate": "例如：创建一个读取笔记、使用 AI 进行总结并将摘要保存到新文件的工作流",
+  "aiWorkflow.placeholderCreate": "例如：总结当前笔记并保存到摘要文件\n要创建技能，请勾选下方的\"作为代理技能创建\"",
   "aiWorkflow.placeholderModify": "例如：在写入文件前添加确认对话框",
   "aiWorkflow.mentionHint": "提示：输入 @ 插入文件引用。生成时将嵌入文件内容。",
   "aiWorkflow.namePlaceholder": "我的工作流",

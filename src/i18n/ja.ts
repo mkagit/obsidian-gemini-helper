@@ -56,10 +56,6 @@ export const ja: Record<string, string> = {
   "settings.cliPathCleared": "CLIパスをクリアしました",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "ワークスペースフォルダ",
-  "settings.workspaceFolder.desc": "チャット履歴とセマンティック検索設定を保存するフォルダ",
-  "settings.workspaceFolder.vaultRoot": "Vaultのルート",
-  "settings.workspaceFolder.willBeCreated": "{{folder}}（作成されます）",
   "settings.hideWorkspaceFolder": "ワークスペースフォルダを非表示",
   "settings.hideWorkspaceFolder.desc": "ファイルエクスプローラーからワークスペースフォルダを非表示にする",
   "settings.saveChatHistory": "チャット履歴を保存",
@@ -210,6 +206,8 @@ export const ja: Record<string, string> = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "ノートとして保存",
+  "chat.savedAsNote": "{{path}}に保存しました",
   "chat.newChat": "新しいチャット",
   "chat.chatHistory": "チャット履歴",
   "chat.noChatHistory": "チャット履歴がありません",
@@ -378,7 +376,7 @@ export const ja: Record<string, string> = {
   "workflow.noWorkflowInFile": "このファイルにワークフローが見つかりません。",
   "workflow.createWithAI": "AIでワークフローを作成",
   "workflow.noWorkflows": "ワークフローがありません",
-  "workflow.newAI": "+ 新規 (AI)",
+  "workflow.newAI": "+ 新規ワークフロー / スキル (AI)",
   "workflow.browseAllWorkflows": "全ワークフローを参照...",
   "workflow.reloadFromFile": "ファイルから再読み込み",
   "workflow.addNode": "ノードを追加",
@@ -697,10 +695,6 @@ export const ja: Record<string, string> = {
   "crypt.editorPlaceholder": "内容を入力...",
 
   // Skills Settings
-  "settings.skills": "エージェントスキル",
-  "settings.skillsFolder": "スキルフォルダ",
-  "settings.skillsFolder.desc": "エージェントスキルフォルダへの相対パス。SKILL.mdファイルを含むサブフォルダがスキルとして認識されます。",
-  "settings.skillsFolder.placeholder": "skills",
 
   // Skills UI
   "skills.add": "スキルを追加",
@@ -753,11 +747,11 @@ export const ja: Record<string, string> = {
   "aiWorkflow.outputPath": "出力パス:",
   "aiWorkflow.currentWorkflow": "現在のワークフロー",
   "aiWorkflow.model": "モデル:",
-  "aiWorkflow.createTitle": "AIでワークフローを作成",
+  "aiWorkflow.createTitle": "AIでワークフロー / スキルを作成",
   "aiWorkflow.modifyTitle": "AIでワークフローを変更",
-  "aiWorkflow.describeCreate": "このワークフローの動作を説明してください:",
+  "aiWorkflow.describeCreate": "作成したいワークフローまたはスキルを説明してください:",
   "aiWorkflow.describeModify": "希望する変更を説明してください:",
-  "aiWorkflow.placeholderCreate": "例: ノートを読み込み、AIで要約し、新しいファイルに保存するワークフロー",
+  "aiWorkflow.placeholderCreate": "例: 現在のノートを要約してサマリーファイルに保存\nスキルを作成する場合は下の「エージェントスキルとして作成」にチェック",
   "aiWorkflow.placeholderModify": "例: ファイル書き込み前に確認ダイアログを追加",
   "aiWorkflow.mentionHint": "ヒント: @を入力してファイル参照を挿入できます。生成時にファイル内容が埋め込まれます。",
   "aiWorkflow.namePlaceholder": "マイワークフロー",

@@ -56,10 +56,6 @@ export const ko: Record<string, string> = {
   "settings.cliPathCleared": "CLI 경로가 지워졌습니다",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "워크스페이스 폴더",
-  "settings.workspaceFolder.desc": "채팅 기록과 시맨틱 검색 설정을 저장할 폴더",
-  "settings.workspaceFolder.vaultRoot": "볼트 루트",
-  "settings.workspaceFolder.willBeCreated": "{{folder}} (생성 예정)",
   "settings.hideWorkspaceFolder": "워크스페이스 폴더 숨기기",
   "settings.hideWorkspaceFolder.desc": "파일 탐색기에서 워크스페이스 폴더를 숨깁니다",
   "settings.saveChatHistory": "채팅 기록 저장",
@@ -210,6 +206,8 @@ export const ko: Record<string, string> = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "노트로 저장",
+  "chat.savedAsNote": "{{path}}에 저장됨",
   "chat.newChat": "새 채팅",
   "chat.chatHistory": "채팅 기록",
   "chat.noChatHistory": "채팅 기록이 없습니다",
@@ -378,7 +376,7 @@ export const ko: Record<string, string> = {
   "workflow.noWorkflowInFile": "이 파일에서 워크플로우를 찾을 수 없습니다.",
   "workflow.createWithAI": "AI로 워크플로우 생성",
   "workflow.noWorkflows": "워크플로우 없음",
-  "workflow.newAI": "+ 새로 만들기 (AI)",
+  "workflow.newAI": "+ 새 워크플로우 / 스킬 (AI)",
   "workflow.browseAllWorkflows": "모든 워크플로 찾아보기...",
   "workflow.reloadFromFile": "파일에서 다시 로드",
   "workflow.addNode": "노드 추가",
@@ -727,10 +725,6 @@ export const ko: Record<string, string> = {
   "input.mcpToolHint": "({{count}}개 도구: {{tools}})",
 
   // Skills Settings
-  "settings.skills": "에이전트 스킬",
-  "settings.skillsFolder": "스킬 폴더",
-  "settings.skillsFolder.desc": "에이전트 스킬 폴더의 상대 경로입니다. skill.md 파일이 있는 각 하위 폴더가 스킬로 처리됩니다.",
-  "settings.skillsFolder.placeholder": "Skills",
 
   // Skills UI
   "skills.add": "스킬 추가",
@@ -753,11 +747,11 @@ export const ko: Record<string, string> = {
   "aiWorkflow.outputPath": "출력 경로:",
   "aiWorkflow.currentWorkflow": "현재 워크플로우",
   "aiWorkflow.model": "모델:",
-  "aiWorkflow.createTitle": "AI로 워크플로우 생성",
+  "aiWorkflow.createTitle": "AI로 워크플로우 / 스킬 만들기",
   "aiWorkflow.modifyTitle": "AI로 워크플로우 수정",
-  "aiWorkflow.describeCreate": "이 워크플로우가 수행할 작업을 설명하세요:",
+  "aiWorkflow.describeCreate": "만들고 싶은 워크플로우 또는 스킬을 설명하세요:",
   "aiWorkflow.describeModify": "원하는 수정 사항을 설명하세요:",
-  "aiWorkflow.placeholderCreate": "예: 노트를 읽고 AI로 요약한 후 새 파일에 요약을 저장하는 워크플로우 생성",
+  "aiWorkflow.placeholderCreate": "예: 현재 노트를 요약하고 요약 파일에 저장\n스킬을 만들려면 아래 \"에이전트 스킬로 만들기\"를 체크하세요",
   "aiWorkflow.placeholderModify": "예: 파일 쓰기 전에 확인 대화상자 추가",
   "aiWorkflow.mentionHint": "팁: @를 입력하여 파일 참조를 삽입하세요. 생성 시 파일 내용이 포함됩니다.",
   "aiWorkflow.namePlaceholder": "내 워크플로우",

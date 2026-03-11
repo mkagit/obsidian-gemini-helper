@@ -56,10 +56,6 @@ export const en = {
   "settings.cliPathCleared": "CLI path cleared",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "Workspace folder",
-  "settings.workspaceFolder.desc": "Folder to store chat histories and semantic search settings",
-  "settings.workspaceFolder.vaultRoot": "Vault root",
-  "settings.workspaceFolder.willBeCreated": "{{folder}} (will be created)",
   "settings.hideWorkspaceFolder": "Hide workspace folder",
   "settings.hideWorkspaceFolder.desc": "Hide the workspace folder from the file explorer",
   "settings.saveChatHistory": "Save chat history",
@@ -210,6 +206,8 @@ export const en = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "Save as note",
+  "chat.savedAsNote": "Saved as {{path}}",
   "chat.newChat": "New chat",
   "chat.chatHistory": "Chat history",
   "chat.noChatHistory": "No chat history yet",
@@ -378,7 +376,7 @@ export const en = {
   "workflow.noWorkflowInFile": "No workflow found in this file.",
   "workflow.createWithAI": "Create workflow with AI",
   "workflow.noWorkflows": "No workflows",
-  "workflow.newAI": "+ new (AI)",
+  "workflow.newAI": "+ new workflow / skill (AI)",
   "workflow.browseAllWorkflows": "Browse all workflows...",
   "workflow.reloadFromFile": "Reload from file",
   "workflow.addNode": "Add node",
@@ -697,10 +695,6 @@ export const en = {
   "crypt.editorPlaceholder": "Enter content...",
 
   // Skills Settings
-  "settings.skills": "Agent skills",
-  "settings.skillsFolder": "Skills folder",
-  "settings.skillsFolder.desc": "Relative path to the agent skills folder. Each subfolder with a skill.md file is treated as a skill.",
-  "settings.skillsFolder.placeholder": "Skills",
 
   // Skills UI
   "skills.add": "Add skill",
@@ -753,11 +747,11 @@ export const en = {
   "aiWorkflow.outputPath": "Output path:",
   "aiWorkflow.currentWorkflow": "Current workflow",
   "aiWorkflow.model": "Model:",
-  "aiWorkflow.createTitle": "Create workflow with AI",
+  "aiWorkflow.createTitle": "Create workflow / skill with AI",
   "aiWorkflow.modifyTitle": "Modify workflow with AI",
-  "aiWorkflow.describeCreate": "Describe what this workflow should do:",
+  "aiWorkflow.describeCreate": "Describe the workflow or skill you want to create:",
   "aiWorkflow.describeModify": "Describe the modifications you want:",
-  "aiWorkflow.placeholderCreate": "E.g., create a workflow that reads a note, summarizes it with AI, and saves the summary to a new file",
+  "aiWorkflow.placeholderCreate": "E.g., summarize the current note and save to a summary file\nfor skills, check \"create as agent skill\" below",
   "aiWorkflow.placeholderModify": "E.g., add a confirmation dialog before writing the file",
   "aiWorkflow.mentionHint": "Tip: type @ to insert file references. The file content will be embedded when generating.",
   "aiWorkflow.namePlaceholder": "My workflow",

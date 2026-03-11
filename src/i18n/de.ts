@@ -56,10 +56,6 @@ export const de: Record<string, string> = {
   "settings.cliPathCleared": "CLI-Pfad gelöscht",
 
   // Settings - Workspace
-  "settings.workspaceFolder": "Arbeitsbereichsordner",
-  "settings.workspaceFolder.desc": "Ordner zum Speichern von Chat-Verläufen und semantischen Sucheinstellungen",
-  "settings.workspaceFolder.vaultRoot": "Vault-Wurzel",
-  "settings.workspaceFolder.willBeCreated": "{{folder}} (wird erstellt)",
   "settings.hideWorkspaceFolder": "Arbeitsbereichsordner ausblenden",
   "settings.hideWorkspaceFolder.desc": "Den Arbeitsbereichsordner im Datei-Explorer ausblenden",
   "settings.saveChatHistory": "Chat-Verlauf speichern",
@@ -210,6 +206,8 @@ export const de: Record<string, string> = {
 
   // Chat
   "chat.title": "Chat",
+  "chat.saveAsNote": "Als Notiz speichern",
+  "chat.savedAsNote": "Gespeichert als {{path}}",
   "chat.newChat": "Neuer Chat",
   "chat.chatHistory": "Chat-Verlauf",
   "chat.noChatHistory": "Noch kein Chat-Verlauf",
@@ -378,7 +376,7 @@ export const de: Record<string, string> = {
   "workflow.noWorkflowInFile": "Kein Workflow in dieser Datei gefunden.",
   "workflow.createWithAI": "Workflow mit KI erstellen",
   "workflow.noWorkflows": "Keine Workflows",
-  "workflow.newAI": "+ Neu (KI)",
+  "workflow.newAI": "+ neuer Workflow / Skill (AI)",
   "workflow.browseAllWorkflows": "Alle Workflows durchsuchen...",
   "workflow.reloadFromFile": "Aus Datei neu laden",
   "workflow.addNode": "Knoten hinzufügen",
@@ -727,10 +725,6 @@ export const de: Record<string, string> = {
   "input.mcpToolHint": "({{count}} Werkzeuge: {{tools}})",
 
   // Skills Settings
-  "settings.skills": "Agent-Skills",
-  "settings.skillsFolder": "Skills-Ordner",
-  "settings.skillsFolder.desc": "Relativer Pfad zum Agent-Skills-Ordner. Jeder Unterordner mit einer skill.md-Datei wird als Skill behandelt.",
-  "settings.skillsFolder.placeholder": "Skills",
 
   // Skills UI
   "skills.add": "Skill hinzufügen",
@@ -753,11 +747,11 @@ export const de: Record<string, string> = {
   "aiWorkflow.outputPath": "Ausgabepfad:",
   "aiWorkflow.currentWorkflow": "Aktueller Workflow",
   "aiWorkflow.model": "Modell:",
-  "aiWorkflow.createTitle": "Workflow mit KI erstellen",
+  "aiWorkflow.createTitle": "Workflow / Skill mit AI erstellen",
   "aiWorkflow.modifyTitle": "Workflow mit KI ändern",
-  "aiWorkflow.describeCreate": "Beschreiben Sie, was dieser Workflow tun soll:",
+  "aiWorkflow.describeCreate": "Beschreiben Sie den Workflow oder Skill, den Sie erstellen möchten:",
   "aiWorkflow.describeModify": "Beschreiben Sie die gewünschten Änderungen:",
-  "aiWorkflow.placeholderCreate": "z.B. Erstelle einen Workflow, der eine Notiz liest, sie mit KI zusammenfasst und die Zusammenfassung in einer neuen Datei speichert",
+  "aiWorkflow.placeholderCreate": "Z.B. Die aktuelle Notiz zusammenfassen und in eine Zusammenfassungsdatei speichern\nFür Skills aktivieren Sie unten \"Als Agent-Skill erstellen\"",
   "aiWorkflow.placeholderModify": "z.B. Einen Bestätigungsdialog vor dem Schreiben der Datei hinzufügen",
   "aiWorkflow.mentionHint": "Tipp: @ eingeben, um Dateireferenzen einzufügen. Der Dateiinhalt wird bei der Generierung eingebettet.",
   "aiWorkflow.namePlaceholder": "Mein Workflow",

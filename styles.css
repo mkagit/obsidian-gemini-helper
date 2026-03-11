@@ -1,13 +1,42 @@
 /* Gemini Helper Plugin Styles */
 
+/* Workflow Mermaid diagram (code block processor) */
+.gemini-helper-workflow-mermaid {
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.gemini-helper-workflow-mermaid svg {
+  max-width: none !important;
+}
+
+/* Wrap long text inside node labels instead of clipping */
+.gemini-helper-workflow-mermaid .nodeLabel {
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 300px;
+  text-align: left !important;
+}
+
 /* Utility: hide element */
 .gemini-helper-hidden {
   display: none !important;
 }
 
 /* Hide workspace folder in file explorer */
-.gemini-helper-workspace-folder-hidden {
+body.gemini-helper-hide-workspace-folder .nav-folder[data-path="GeminiHelper"],
+body.gemini-helper-hide-workspace-folder .nav-folder:has(> [data-path="GeminiHelper"]) {
   display: none !important;
+}
+
+/* Folder icons in file explorer */
+.nav-folder[data-path="skills"] > .nav-folder-title > .nav-folder-title-content::before,
+.nav-folder:has(> [data-path="skills"]) > .nav-folder-title > .nav-folder-title-content::before {
+  content: "🧩 ";
+}
+.nav-folder[data-path="workflows"] > .nav-folder-title > .nav-folder-title-content::before,
+.nav-folder:has(> [data-path="workflows"]) > .nav-folder-title > .nav-folder-title-content::before {
+  content: "⚡ ";
 }
 
 /* Selection Highlight - shows where {selection} text came from */
