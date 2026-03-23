@@ -4,7 +4,22 @@
 
 **免费开源的** Obsidian AI 助手，提供由 Google Gemini 驱动的 **聊天**、**工作流自动化** 和 **RAG** 功能。
 
-> **本插件完全免费。** 您只需要从 [ai.google.dev](https://ai.google.dev) 获取 Google Gemini API 密钥（免费或付费），或使用 CLI 工具：[Gemini CLI](https://github.com/google-gemini/gemini-cli)、[Claude Code](https://github.com/anthropics/claude-code) 或 [Codex CLI](https://github.com/openai/codex)。
+> **从 v1.11.0 起，本插件专注于 Gemini 相关功能。**
+> CLI 支持已被移除。已创建新插件 [obsidian-llm-hub](https://github.com/takeshy/obsidian-llm-hub)，支持 CLI 和多种 LLM 提供商（OpenAI、Claude、OpenRouter、Local LLM）。
+> GemiHub（Google Drive）集成已分离至 [obsidian-gemihub](https://github.com/takeshy/obsidian-gemihub)。
+
+### 相关插件
+
+| 插件 | 说明 |
+|------|------|
+| obsidian-gemini-helper | 专注于 Gemini（RAG 通过 File Search API） |
+| obsidian-llm-hub | 多 LLM 支持，仅限桌面端（RAG 通过 Embedding，支持 gemini-embedding-2-preview） |
+| obsidian-local-llm-hub | 仅限本地 LLM（RAG 仅通过本地 Embedding） |
+| obsidian-gemihub | 通过 Google Drive 与 GemiHub（gemini-helper 网页版）进行文件同步 |
+
+---
+
+> **本插件完全免费。** 您只需要从 [ai.google.dev](https://ai.google.dev) 获取 Google Gemini API 密钥（免费或付费）。
 
 ## 主要特性
 
@@ -18,32 +33,26 @@
 
 ![聊天中的图像生成](docs/images/chat_image.png)
 
-## API 密钥 / CLI 选项
+## API 密钥
 
-本插件需要 Google Gemini API 密钥或 CLI 工具。您可以选择：
+本插件需要 Google Gemini API 密钥。您可以选择：
 
-| 功能 | 免费 API 密钥 | 付费 API 密钥 | CLI |
-|---------|--------------|--------------|-----|
-| 基础聊天 | ✅ | ✅ | ✅ |
-| 仓库操作 | ✅ | ✅ | 仅读取/搜索 |
-| 网页搜索 | ✅ | ✅ | ❌ |
-| RAG | ✅ (有限制) | ✅ | ❌ |
-| 工作流 | ✅ | ✅ | ✅ |
-| 图像生成 | ❌ | ✅ | ❌ |
-| 模型 | Flash, Gemma | Flash, Pro, Image | Gemini CLI, Claude Code, Codex |
-| 费用 | **免费** | 按使用付费 | **免费** |
-
-> [!TIP]
-> **CLI 选项** 让您只需一个账户即可使用旗舰模型 - 无需 API 密钥！
-> - **Gemini CLI**：安装 [Gemini CLI](https://github.com/google-gemini/gemini-cli)，运行 `gemini` 并使用 `/auth` 进行身份验证
-> - **Claude CLI**：安装 [Claude Code](https://github.com/anthropics/claude-code)（`npm install -g @anthropic-ai/claude-code`），运行 `claude` 并进行身份验证
-> - **Codex CLI**：安装 [Codex CLI](https://github.com/openai/codex)（`npm install -g @openai/codex`），运行 `codex` 并进行身份验证
+| 功能 | 免费 API 密钥 | 付费 API 密钥 |
+|---------|--------------|--------------|
+| 基础聊天 | ✅ | ✅ |
+| 仓库操作 | ✅ | ✅ |
+| 网页搜索 | ✅ | ✅ |
+| RAG | ✅ (有限制) | ✅ |
+| 工作流 | ✅ | ✅ |
+| 图像生成 | ❌ | ✅ |
+| 模型 | Flash, Gemma | Flash, Pro, Image |
+| 费用 | **免费** | 按使用付费 |
 
 ### 免费 API 密钥使用技巧
 
 - **速率限制** 按模型计算，每日重置。切换模型可继续使用。
 - **RAG 同步** 有限制。每天运行"同步仓库" - 已上传的文件会被跳过。
-- **Gemma 模型** 和 **Gemini CLI** 在聊天中不支持仓库操作，但**工作流仍可使用 `note`、`note-read` 等节点类型读写笔记**。`{content}` 和 `{selection}` 变量同样有效。
+- **Gemma 模型** 在聊天中不支持仓库操作，但**工作流仍可使用 `note`、`note-read` 等节点类型读写笔记**。`{content}` 和 `{selection}` 变量同样有效。
 
 ---
 
@@ -79,11 +88,11 @@ AI 聊天功能提供与 Google Gemini 的交互式对话界面，与您的 Obsi
 > `{selection}` 和 `{content}` 都**故意不在输入区域展开**——由于聊天输入框较小，展开长文本会使输入变得困难。内容会在您发送消息时展开，您可以通过查看聊天中已发送的消息来验证这一点。
 
 > [!NOTE]
-> 仓库文件的 @ 提及仅插入文件路径 - AI 通过工具读取内容。这在 Gemma 模型中不可用（不支持仓库工具）。Gemini CLI 可通过 shell 读取文件，但响应格式可能有所不同。
+> 仓库文件的 @ 提及仅插入文件路径 - AI 通过工具读取内容。这在 Gemma 模型中不可用（不支持仓库工具）。
 
 ## 文件附件
 
-直接附加文件：图像（PNG、JPEG、GIF、WebP）、PDF、文本文件
+直接附加文件：图像（PNG、JPEG、GIF、WebP）、PDF、文本文件、音频（MP3、WAV、FLAC、AAC、Opus、OGG）、视频（MP4、WebM、MOV、AVI、MKV）
 
 ## 函数调用（仓库操作）
 
@@ -126,17 +135,16 @@ AI 可以使用以下工具与您的仓库交互：
 
 | 条件 | 默认模式 | 可更改 |
 |------|----------|--------|
-| CLI 模型（Gemini/Claude/Codex CLI） | Vault: 关闭 | 否 |
 | Gemma 模型 | Vault: 关闭 | 否 |
 | 启用 Web Search | Vault: 关闭 | 否 |
-| 启用 RAG | Vault: 关闭 | 否 |
+| RAG 已启用 | Vault: 关闭 | 否 |
 | 无 RAG | Vault: 全部 | 是 |
 
 **为什么某些模式是强制的：**
 
-- **CLI/Gemma 模型**：这些模型不支持函数调用，因此无法使用 Vault 工具。
+- **Gemma 模型**：这些模型不支持函数调用，因此无法使用 Vault 工具。
 - **Web Search**：按设计，当启用 Web Search 时，Vault 工具会被禁用。
-- **启用 RAG**：Gemini API 不支持将 File Search（RAG）与函数调用结合使用。启用 RAG 时，Vault 工具和 MCP 会自动禁用。
+- **RAG 已启用**：Gemini API 不支持将 File Search（RAG）与函数调用结合使用。启用 RAG 时，Vault 工具和 MCP 会自动禁用。
 
 ## 安全编辑
 
@@ -195,7 +203,7 @@ AI 可以使用以下工具与您的仓库交互：
 
 检索增强生成，用于智能仓库搜索：
 
-- **支持的文件** - Markdown、PDF、图像（PNG、JPEG、GIF、WebP）
+- **支持的文件** - Markdown、PDF、Office 文档（Doc、Docx、XLS、XLSX、PPTX）
 - **内部模式** - 将仓库文件同步到 Google File Search
 - **外部模式** - 使用现有的存储 ID
 - **增量同步** - 仅上传更改的文件
@@ -258,7 +266,6 @@ MCP（Model Context Protocol）服务器提供额外的工具，扩展 AI 在 Va
 - **参考资料** - 在 `references/` 中包含风格指南、模板和检查清单
 - **工作流集成** - 技能可以将工作流作为 Function Calling 工具公开
 - **斜杠命令** - 输入 `/folder-name` 即可立即调用技能并发送
-- **CLI 模式支持** - 技能可在 Gemini CLI、Claude CLI 和 Codex CLI 后端中使用
 - **选择性激活** - 按对话选择哪些技能处于活动状态
 
 创建技能的方式与工作流相同 — 选择 **+ New (AI)**，勾选 **"作为代理技能创建"**，然后描述您想要的功能。AI 会同时生成 `SKILL.md` 指令和工作流。
@@ -464,66 +471,7 @@ npm run build
 
 ![基础设置](docs/images/setting_basic.png)
 
-### CLI 模式（Gemini / Claude / Codex）
-
-**Gemini CLI：**
-1. 安装 [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-2. 使用 `gemini` → `/auth` 进行身份验证
-3. 在 Gemini CLI 部分点击"Verify"
-
-**Claude CLI：**
-1. 安装 [Claude Code](https://github.com/anthropics/claude-code)：`npm install -g @anthropic-ai/claude-code`
-2. 使用 `claude` 进行身份验证
-3. 在 Claude CLI 部分点击"Verify"
-
-**Codex CLI：**
-1. 安装 [Codex CLI](https://github.com/openai/codex)：`npm install -g @openai/codex`
-2. 使用 `codex` 进行身份验证
-3. 在 Codex CLI 部分点击"Verify"
-
-**CLI 限制：** 仅支持只读仓库操作，不支持语义搜索/网页搜索
-
-> [!NOTE]
-> **仅使用 CLI：** 您可以在没有 Google API 密钥的情况下使用 CLI 模式。只需安装并验证 CLI 工具即可，无需 API 密钥。
-
-**自定义 CLI 路径：** 如果 CLI 自动检测失败，点击 Verify 按钮旁边的齿轮图标（⚙️）手动指定 CLI 路径。插件会自动搜索常见安装路径，包括版本管理器（nodenv、nvm、volta、fnm、asdf、mise）。
-
-<details>
-<summary><b>Windows：如何查找 CLI 路径</b></summary>
-
-1. 打开 PowerShell 并运行：
-   ```powershell
-   Get-Command gemini
-   ```
-2. 这会显示脚本路径（例如：`C:\Users\YourName\AppData\Roaming\npm\gemini.ps1`）
-3. 从 `npm` 文件夹导航到实际的 `index.js`：
-   ```
-   C:\Users\YourName\AppData\Roaming\npm\node_modules\@google\gemini-cli\dist\index.js
-   ```
-4. 在 CLI 路径设置中输入此完整路径
-
-对于 Claude CLI，使用 `Get-Command claude` 并导航到 `node_modules\@anthropic-ai\claude-code\dist\index.js`。
-</details>
-
-<details>
-<summary><b>macOS / Linux：如何查找 CLI 路径</b></summary>
-
-1. 打开终端并运行：
-   ```bash
-   which gemini
-   ```
-2. 将显示的路径（例如：`/home/user/.local/bin/gemini`）输入到 CLI 路径设置中
-
-对于 Claude CLI，使用 `which claude`。对于 Codex CLI，使用 `which codex`。
-
-**Node.js 版本管理器：** 如果您使用 nodenv、nvm、volta、fnm、asdf 或 mise，插件会自动从常见位置检测 node 二进制文件。如果检测失败，请直接指定 CLI 脚本路径（例如：`~/.npm-global/lib/node_modules/@google/gemini-cli/dist/index.js`）。
-</details>
-
-> [!TIP]
-> **Claude CLI 技巧：** 来自 Gemini Helper 的聊天会话会本地存储。您可以在 Obsidian 之外继续对话，方法是在您的仓库目录中运行 `claude --resume` 来查看和恢复之前的会话。
-
 ### 工作区设置
-- **工作区文件夹** - 聊天历史和设置存储位置
 - **系统提示词** - 额外的 AI 指令
 - **工具限制** - 控制函数调用限制
 - **编辑历史** - 追踪和恢复 AI 所做的更改
@@ -796,8 +744,8 @@ AI 工作流模态框支持拖放定位和从角落调整大小，以提供更�
 ## 系统要求
 
 - Obsidian v0.15.0+
-- Google AI API 密钥，或 CLI 工具（Gemini CLI / Claude CLI / Codex CLI）
-- 支持桌面端和移动端（CLI 模式：仅限桌面端）
+- Google AI API 密钥
+- 支持桌面端和移动端
 
 ## 隐私
 
@@ -815,24 +763,9 @@ AI 工作流模态框支持拖放定位和从角落调整大小，以提供更�
 **发送到第三方服务的数据：**
 - 工作流 `http` 节点可以向工作流中指定的任何 URL 发送数据
 
-**CLI 提供程序（可选）：**
-- 启用 CLI 模式时，外部 CLI 工具（gemini、claude、codex）通过 child_process 执行
-- 仅在用户明确配置和验证时才会发生
-- CLI 模式仅限桌面端（移动端不可用）
-
 **MCP 服务器（可选）：**
 - MCP（模型上下文协议）服务器可以在插件设置中为工作流 `mcp` 节点配置
 - MCP 服务器是提供额外工具和功能的外部服务
-
-**通过 GemiHub 同步 Google Drive（可选）：**
-- 启用 Google Drive 同步后，Vault 文件会上传到您自己的 Google Drive 账户
-- 使用的网络端点：
-  - `https://www.googleapis.com/drive/v3` — 文件元数据和同步操作
-  - `https://www.googleapis.com/upload/drive/v3` — 文件上传
-  - `https://gemihub.online/api/obsidian/token` — OAuth 令牌刷新（见下文）
-- **令牌刷新流程：** 您的加密刷新令牌被发送到 GemiHub 代理，代理添加 OAuth 客户端密钥后将请求转发到 Google 的令牌端点。由于 OAuth 客户端密钥无法安全地嵌入客户端代码中，因此需要代理。代理不会存储或记录令牌。请参阅 [GemiHub 隐私政策](https://gemihub.online/privacy)。
-- 加密的认证数据（RSA + AES-256-GCM）存储在插件设置中；解密密码永远不会被传输
-- 不会向 GemiHub 发送任何 Vault 内容 — 文件直接在 Obsidian 和 Google Drive API 之间同步
 
 **安全注意事项：**
 - 运行前请审查工作流 - `http` 节点可以将仓库数据传输到外部端点
@@ -845,30 +778,6 @@ AI 工作流模态框支持拖放定位和从角落调整大小，以提供更�
 ## 许可证
 
 MIT
-
-## 实验性功能
-
-### Google Drive Sync (GemiHub Connection)
-
-通过 [GemiHub](https://gemihub.online) 将您的 Obsidian vault 与 Google Drive 同步。在 Obsidian 中编辑笔记并从 GemiHub 的网页界面访问，反之亦然。
-
-![Drive Sync 解锁](docs/images/gemihub_connection/start_with_sync.png)
-
-**GemiHub 独有功能**（Obsidian 插件中不可用）：
-
-- **Automatic RAG** - 同步到 GemiHub 的文件会在每次同步时自动索引以进行语义搜索，无需手动设置
-- **OAuth2-enabled MCP** - 使用需要 OAuth2 认证的 MCP 服务器（例如 Google Calendar、Gmail、Google Docs）
-- **Markdown to PDF/HTML conversion** - 将您的 Markdown 笔记转换为格式化的 PDF 或 HTML 文档
-- **Public publishing** - 使用可共享的公开 URL 发布转换后的 HTML/PDF 文档
-
-**通过连接为 Obsidian 添加的功能：**
-
-- **带 diff 预览的双向同步** - Push 和 pull 文件时提供详细的文件列表和 unified diff 视图，在提交更改前进行确认
-- **带 diff 的冲突解决** - 当同一文件在两端都被编辑时，使用彩色 unified diff 解决冲突
-- **Drive 编辑历史** - 跟踪来自 Obsidian 和 GemiHub 两端的更改，按文件显示历史并标注来源（本地/远程）
-- **冲突备份管理** - 浏览、预览和恢复存储在 Drive 上的冲突备份
-
-> **设置：** 请参阅 [GemiHub Connection 指南](docs/GEMIHUB_CONNECTION_zh.md) 获取设置说明。
 
 ## 链接
 
