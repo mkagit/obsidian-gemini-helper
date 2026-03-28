@@ -122,53 +122,32 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	);
 	// Vault tool mode: "all" = use all tools, "noSearch" = exclude search_notes/list_notes, "none" = no vault tools
 	const [vaultToolMode, setVaultToolMode] = useState<"all" | "noSearch" | "none">(() => {
-		const ragSetting = plugin.workspaceState.selectedRagSetting;
 		const initialModel = plugin.getSelectedModel();
 		const isInitialGemma = initialModel.toLowerCase().includes("gemma");
 
-		// Gemma models: always "none"
+		// Gemma models: always "none" (no function calling support)
 		if (isInitialGemma) {
-			return "none";
-		}
-		if (ragSetting === "__websearch__") {
-			return "none";
-		}
-		// RAG enabled: force "none" (fileSearch + functionDeclarations not supported)
-		if (ragSetting) {
 			return "none";
 		}
 		return "all";
 	});
 	// Reason why vault tools are "none" - determines whether MCP should also be disabled
 	const [, setVaultToolNoneReason] = useState<VaultToolNoneReason | null>(() => {
-		const ragSetting = plugin.workspaceState.selectedRagSetting;
 		const initialModel = plugin.getSelectedModel();
 		const isInitialGemma = initialModel.toLowerCase().includes("gemma");
 
 		if (isInitialGemma) {
 			return "gemma";
 		}
-		if (ragSetting === "__websearch__") {
-			return "websearch";
-		}
-		// RAG enabled: fileSearch + functionDeclarations not supported
-		if (ragSetting) {
-			return "rag";
-		}
 		return null;
 	});
 	// MCP servers state: local copy with per-server enabled state (for chat session)
-	// If vaultToolNoneReason is not "manual", disable all MCP servers initially
 	const [mcpServers, setMcpServers] = useState(() => {
-		const ragSetting = plugin.workspaceState.selectedRagSetting;
 		const initialModel = plugin.getSelectedModel();
 		const isInitialGemma = initialModel.toLowerCase().includes("gemma");
 
-		// Check if MCP should be disabled (same logic as vaultToolNoneReason)
-		const shouldDisableMcp = isInitialGemma ||
-			ragSetting === "__websearch__" || !!ragSetting;
-
-		if (shouldDisableMcp) {
+		// Gemma models don't support function calling — disable MCP
+		if (isInitialGemma) {
 			return plugin.settings.mcpServers.map(s => ({ ...s, enabled: false }));
 		}
 		return [...plugin.settings.mcpServers];
@@ -591,22 +570,6 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 	const handleRagSettingChange = (name: string | null) => {
 		setSelectedRagSetting(name);
 		void plugin.selectRagSetting(name);
-
-		if (name === "__websearch__") {
-			// Web Search: force to "none" (no vault tools)
-			setVaultToolMode("none");
-			setVaultToolNoneReason("websearch");
-			setMcpServers(servers => servers.map(s => ({ ...s, enabled: false })));
-		} else if (name) {
-			// RAG enabled: force to "none" (fileSearch + functionDeclarations not supported)
-			setVaultToolMode("none");
-			setVaultToolNoneReason("rag");
-			setMcpServers(servers => servers.map(s => ({ ...s, enabled: false })));
-		} else {
-			// No RAG selected: default to "all"
-			setVaultToolMode("all");
-			setVaultToolNoneReason(null);
-		}
 	};
 
 	// Handle vault tool mode change from UI
@@ -636,7 +599,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 
 		// Auto-adjust search setting and vault tool mode for special models
 		if (isNewModelGemma) {
-			// Gemma: force Search to None and Vault to Off
+			// Gemma: force Search to None and Vault to Off (no function calling)
 			if (selectedRagSetting !== null) {
 				handleRagSettingChange(null);
 			}
@@ -648,24 +611,12 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 			if (selectedRagSetting !== null && selectedRagSetting !== "__websearch__") {
 				handleRagSettingChange(null);
 			}
-			// Reset vault tool mode for image generation models
 			setVaultToolMode("all");
 			setVaultToolNoneReason(null);
 		} else {
-			// Normal models: check current RAG setting and reset appropriately
-			if (selectedRagSetting === "__websearch__") {
-				setVaultToolMode("none");
-				setVaultToolNoneReason("websearch");
-				setMcpServers(servers => servers.map(s => ({ ...s, enabled: false })));
-			} else if (selectedRagSetting) {
-				// RAG enabled: force to "none" (fileSearch + functionDeclarations not supported)
-				setVaultToolMode("none");
-				setVaultToolNoneReason("rag");
-				setMcpServers(servers => servers.map(s => ({ ...s, enabled: false })));
-			} else {
-				setVaultToolMode("all");
-				setVaultToolNoneReason(null);
-			}
+			// Normal models: restore vault tools (Interactions API supports all tools simultaneously)
+			setVaultToolMode("all");
+			setVaultToolNoneReason(null);
 		}
 	};
 
@@ -1035,10 +986,8 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					}
 				}
 
-				// Fetch MCP tools from enabled servers only (skip if vaultToolMode is "none")
-				const enabledMcpServers = vaultToolMode !== "none"
-					? mcpServers.filter(s => s.enabled)
-					: [];
+				// Fetch MCP tools from enabled servers
+				const enabledMcpServers = mcpServers.filter(s => s.enabled);
 				const mcpTools: McpToolDefinition[] = toolsEnabled && enabledMcpServers.length > 0
 					? await fetchMcpTools(enabledMcpServers)
 					: [];
@@ -1398,13 +1347,9 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					? plugin.getSelectedStoreIds()
 					: [];
 
-				// RAG-only mode: server RAG enabled means only fileSearch tool is sent,
-				// so vault tool descriptions should be excluded from the system prompt
-				const ragOnlyMode = ragStoreIds.length > 0;
-
 				let systemPrompt = "You are a helpful AI assistant integrated with Obsidian.";
 
-				if (toolsEnabled && !ragOnlyMode) {
+				if (toolsEnabled) {
 					systemPrompt += `
 
 Available tools allow you to:
@@ -1417,7 +1362,7 @@ Available tools allow you to:
 				}
 
 				// Add RAG sync status info if server RAG is enabled (uses FileSearchManager)
-				if (allowRag && toolsEnabled && !ragOnlyMode) {
+				if (allowRag && toolsEnabled) {
 						systemPrompt += `
 - Check RAG sync status: When users ask about imported files, use the get_rag_sync_status tool to:
   - Check a specific file's sync status (when it was imported, if it has changes)
@@ -1467,9 +1412,23 @@ Always be helpful and provide clear, concise responses. When working with notes,
 				let imageGenerationUsed = false;
 				const generatedImages: GeneratedImage[] = [];
 				let streamUsage: Message["usage"] = undefined;
+				let streamInteractionId: string | undefined;
 				const startTime = Date.now();
 
 				let stopped = false;
+
+				// Resolve previous interaction ID for Interactions API conversation chaining.
+				// Only chain when the most recent assistant message (array tail) carries an
+				// interactionId.  If it doesn't (old chat history, image generation response,
+				// CLI response, etc.) we fall back to local history replay in gemini.ts.
+				const previousInteractionId = (() => {
+					for (let i = messages.length - 1; i >= 0; i--) {
+						if (messages[i].role === "assistant") {
+							return messages[i].interactionId;  // undefined if absent → fallback
+						}
+					}
+					return undefined;
+				})();
 
 				// Use image generation stream or regular chat stream
 				const chunkStream = isImageGeneration
@@ -1490,6 +1449,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 							disableTools: !toolsEnabled,
 							enableThinking: getThinkingToggle(allowedModel),
 							traceId,
+							previousInteractionId,
 						}
 					);
 
@@ -1550,9 +1510,12 @@ Always be helpful and provide clear, concise responses. When working with notes,
 						throw new Error(chunk.error || "Unknown error");
 
 					case "done":
-						// Capture usage data from the final chunk
+						// Capture usage data and interaction ID from the final chunk
 						if (chunk.usage) {
 							streamUsage = chunk.usage;
+						}
+						if (chunk.interactionId) {
+							streamInteractionId = chunk.interactionId;
 						}
 						break;
 				}
@@ -1593,6 +1556,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 					mcpApps: collectedMcpApps.length > 0 ? collectedMcpApps : undefined,
 					usage: streamUsage,
 					elapsedMs: Date.now() - startTime,
+					interactionId: streamInteractionId,
 				};
 
 				const newMessages = [...messages, userMessage, assistantMessage];
@@ -1975,7 +1939,7 @@ Always be helpful and provide clear, concise responses. When working with notes,
 						onRagSettingChange={handleRagSettingChange}
 						vaultToolMode={vaultToolMode}
 						onVaultToolModeChange={handleVaultToolModeChange}
-						vaultToolModeOnlyNone={isGemmaModel || !!selectedRagSetting}
+						vaultToolModeOnlyNone={isGemmaModel}
 						thinkFlash={thinkFlash}
 						thinkFlashLite={thinkFlashLite}
 						onThinkFlashChange={setThinkFlash}
