@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, X, Plus } from "lucide-react";
 import type { SkillMetadata } from "src/core/skillsLoader";
+import { isBuiltinSkillPath } from "src/core/builtinSkills";
 import { t } from "src/i18n";
 
 interface SkillSelectorProps {
@@ -39,7 +40,7 @@ export default function SkillSelector({
     <div className="gemini-helper-skill-selector">
       <Sparkles size={14} className="gemini-helper-skill-icon" />
       {activeSkills.map(skill => (
-        <span key={skill.folderPath} className="gemini-helper-skill-chip">
+        <span key={skill.folderPath} className="gemini-helper-skill-chip" title={skill.description}>
           {skill.name}
           <button
             className="gemini-helper-skill-chip-remove"
@@ -72,7 +73,12 @@ export default function SkillSelector({
                   disabled={disabled}
                 />
                 <div className="gemini-helper-skill-dropdown-info">
-                  <span className="gemini-helper-skill-dropdown-name">{skill.name}</span>
+                  <span className="gemini-helper-skill-dropdown-name">
+                    {skill.name}
+                    {isBuiltinSkillPath(skill.folderPath) && (
+                      <span className="gemini-helper-skill-builtin-badge">built-in</span>
+                    )}
+                  </span>
                   {skill.description && (
                     <span className="gemini-helper-skill-dropdown-desc">{skill.description}</span>
                   )}
