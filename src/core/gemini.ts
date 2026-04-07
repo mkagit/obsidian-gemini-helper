@@ -315,6 +315,24 @@ export interface ChatWithToolsOptions {
   previousInteractionId?: string | null;  // For Interactions API conversation chaining
 }
 
+// Sanitize function call results for Gemini API.
+// The API rejects function_response containing empty arrays ([]).
+// This recursively replaces empty arrays with null.
+function sanitizeFunctionResult(value: unknown): unknown {
+  if (value === undefined || value === null) return value;
+  if (Array.isArray(value)) {
+    return value.length === 0 ? null : value.map(sanitizeFunctionResult);
+  }
+  if (typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      result[k] = sanitizeFunctionResult(v);
+    }
+    return result;
+  }
+  return value;
+}
+
 // Interactions API usage → TracingUsage converter
 function extractInteractionsUsage(usage: Interactions.Usage | undefined, model?: string): TracingUsage | undefined {
   if (!usage) return undefined;
@@ -795,14 +813,19 @@ export class GeminiClient {
 
     // Build tools for Interactions API
     // Unlike Chat API, Interactions API allows function tools + file search + Google search together
+    // Gemma 4: file_search not supported; cannot combine google_search with function calling
+    const isGemma4Model = this.model.toLowerCase().includes("gemma-4");
+    const effectiveRagEnabled = ragEnabled && !isGemma4Model;
+    const effectiveWebSearch = webSearchEnabled ?? false;
     let interactionTools: Interactions.Tool[] | undefined;
     if (!options?.disableTools) {
-      const functionTools = tools.length > 0 ? tools : [];
+      // Gemma 4: when google_search is active, drop function calling tools
+      const functionTools = isGemma4Model && effectiveWebSearch ? [] : (tools.length > 0 ? tools : []);
       interactionTools = this.toolsToInteractionsFormat(
         functionTools,
-        ragEnabled ? ragStoreIds : undefined,
-        ragEnabled ? clampedTopK : undefined,
-        webSearchEnabled,
+        effectiveRagEnabled ? ragStoreIds : undefined,
+        effectiveRagEnabled ? clampedTopK : undefined,
+        effectiveWebSearch,
       );
       if (interactionTools.length === 0) interactionTools = undefined;
     }
@@ -1121,11 +1144,12 @@ export class GeminiClient {
 
             // Build FunctionResultContent for Interactions API
             // Preserve original result structure (object/array) so the model can consume fields directly
+            // Sanitize to avoid API rejection of empty values (empty arrays, empty strings)
             functionResults.push({
               type: "function_result",
               call_id: fc.id,
               name: fc.name,
-              result: result,
+              result: sanitizeFunctionResult(result),
             } as Interactions.Content);
           }
 
