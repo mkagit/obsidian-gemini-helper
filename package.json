@@ -1,6 +1,6 @@
 {
   "name": "obsidian-gemini-helper",
-  "version": "1.12.6",
+  "version": "1.13.1",
   "description": "AI-powered assistant using Google Gemini with File Search RAG capabilities",
   "main": "main.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "build:langfuse": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production langfuse",
     "test": "vitest run",
     "lint": "eslint .",
+    "preversion": "npm run lint && npm run build",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [
