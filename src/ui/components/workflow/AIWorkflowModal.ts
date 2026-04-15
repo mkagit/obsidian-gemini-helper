@@ -3,9 +3,9 @@ import type { GeminiHelperPlugin } from "src/plugin";
 import { GeminiClient } from "src/core/gemini";
 import { tracing } from "src/core/tracingHooks";
 import { getAvailableModels, SKILLS_FOLDER, WORKFLOWS_FOLDER, type ModelType, type Attachment, type StreamChunkUsage } from "src/types";
-import { getWorkflowSpecification } from "src/workflow/workflowSpec";
+import { getWorkflowSpecification, buildWorkflowSpecContext } from "src/workflow/workflowSpec";
 import type { SidebarNode, WorkflowNodeType, ExecutionStep } from "src/workflow/types";
-import { listWorkflowOptions, normalizeYamlText } from "src/workflow/parser";
+import { findWorkflowBlocks, normalizeYamlText } from "src/workflow/parser";
 import { ExecutionHistoryManager } from "src/workflow/history";
 import { renderDiffView, createDiffViewToggle } from "./DiffRenderer";
 import { WorkflowGenerationModal } from "./WorkflowGenerationModal";
@@ -13,6 +13,7 @@ import { showWorkflowPreview } from "./WorkflowPreviewModal";
 import { showExecutionHistorySelect } from "./ExecutionHistorySelectModal";
 import { ConfirmModal } from "../ConfirmModal";
 import { formatError } from "src/utils/error";
+import { findFileMentionOccurrences, findLiteralOccurrences, type MentionOccurrence } from "src/utils/mentionResolver";
 import { t, getLocale } from "src/i18n";
 
 // Supported file types for attachments
@@ -840,8 +841,25 @@ export class AIWorkflowModal extends Modal {
     if (this.mode === "create") {
       const isSkill = this.isSkill();
 
+      // For non-skill create: refuse when the target already holds a workflow
+      // block. The modal stays open so the user can edit the output path
+      // (same UX as picking a fresh name up front) instead of us silently
+      // clobbering or suffixing the path downstream.
+      const rejectIfTargetHasWorkflow = async (outputPath: string): Promise<boolean> => {
+        if (isSkill) return false;
+        const path = outputPath.endsWith(".md") ? outputPath : `${outputPath}.md`;
+        const existing = this.app.vault.getAbstractFileByPath(path);
+        if (!(existing instanceof TFile)) return false;
+        const existingContent = await this.app.vault.cachedRead(existing);
+        if (findWorkflowBlocks(existingContent).length > 0) {
+          new Notice(t("workflow.generation.outputPathTaken", { path }));
+          return true;
+        }
+        return false;
+      };
+
       // Create mode: save markdown directly (validate it has workflow blocks)
-      const options = listWorkflowOptions(pastedText);
+      const options = findWorkflowBlocks(pastedText);
       if (options.length === 0) {
         // Fallback: try parsing as raw YAML
         const parsed = parseWorkflowResponse(pastedText);
@@ -863,6 +881,7 @@ export class AIWorkflowModal extends Modal {
             parsed.skillInstructions = parsed.explanation.replace(/\n---\s*$/, "").trim();
           }
         }
+        if (await rejectIfTargetHasWorkflow(parsed.outputPath)) return;
         this.resolvePromise(parsed);
         this.close();
         return;
@@ -896,6 +915,7 @@ export class AIWorkflowModal extends Modal {
         rawMarkdown: workflowMarkdown,
         skillInstructions,
       };
+      if (await rejectIfTargetHasWorkflow(result.outputPath!)) return;
       this.resolvePromise(result);
       this.close();
     } else {
@@ -1687,12 +1707,7 @@ ${outputInstruction}`;
   }
 
   private getWorkflowSpec(): string {
-    return getWorkflowSpecification({
-      apiPlan: this.plugin.settings.apiPlan,
-      mcpServers: this.plugin.settings.mcpServers || [],
-      ragSettingNames: Object.keys(this.plugin.workspaceState.ragSettings || {}),
-      hasApiKey: !!this.plugin.settings.googleApiKey,
-    });
+    return getWorkflowSpecification(buildWorkflowSpecContext(this.plugin));
   }
 
   private buildSystemPrompt(outputAsMarkdown = false, isSkill = false): string {
@@ -1718,7 +1733,7 @@ The body text that guides the AI assistant when this skill is activated in chat.
 **What to include:**
 - Role description with clear persona (e.g., "You are a code review assistant specializing in...")
 - Step-by-step behavioral guidelines explaining the reasoning behind each step
-- When and how to invoke the workflow, including what input variables to provide
+- When and how to invoke the workflow — reference each input variable by its **exact name** (as used in the workflow's \`{{var}}\` references) so the runtime's auto-derived \`inputVariables\` list matches what the body documents
 - Edge cases and how to handle them
 
 Example:
@@ -1728,14 +1743,37 @@ You are a code review assistant. When reviewing code:
 1. Check for common bugs and anti-patterns — these are the most impactful issues to catch early
 2. Suggest improvements for readability, because code is read far more often than written
 3. Verify error handling is adequate for production use
-4. Use the workflow to run automated checks, passing the file path as the "target" variable
+4. Use the workflow to run automated checks, passing the file path as the \`target\` variable
 
 When the user shares code without explicit review requests, still offer brief observations about potential issues. This proactive approach helps catch problems before they grow.
 \`\`\`
 
 ### 2. Workflow
 An executable workflow in YAML format that the skill provides as a tool.
-The workflow should have clear input variables that the AI will provide when calling run_skill_workflow, and meaningful output variables the AI can use to continue the conversation.
+- Any variable you read via \`{{var}}\` without initializing (no preceding \`variable\` / \`set\` node and no \`saveTo\` target) becomes an **input variable**. The runtime extracts these automatically and writes them into SKILL.md's \`skill-capabilities\` fenced YAML block as \`workflows[0].inputVariables\`, so the chat LLM will see them when deciding what to pass to \`run_skill_workflow\`.
+- Pick short, descriptive input variable names (e.g. \`filePath\`, \`query\`, \`mode\`). Avoid names starting with \`_\` — those are reserved for runtime-provided system variables.
+- Save meaningful results to named variables that the chat LLM can consume after \`run_skill_workflow\` returns.
+
+### SKILL.md layout (written for you)
+You do NOT need to emit SKILL.md frontmatter or the capability block. The runtime constructs them from your output:
+\`\`\`markdown
+---
+name: <skill name>
+description: <skill description>
+---
+
+\`\`\`skill-capabilities
+workflows:
+  - path: workflows/workflow.md
+    description: <skill name>
+    inputVariables: [<derived from your workflow YAML>]
+\`\`\`
+
+<your SKILL.md instructions body goes here>
+\`\`\`
+- Frontmatter holds only user-facing metadata (name, description).
+- Workflow IDs and their input variables live in the \`skill-capabilities\` fenced YAML block. The runtime fills this in; you just need the workflow YAML's \`{{var}}\` usage to be clean and unambiguous so the derived \`inputVariables\` list is correct.
+- Your instructions prose should reference input variables by their exact name (so the LLM knows what to pass when invoking the workflow).
 `
       : "";
 
@@ -1928,53 +1966,89 @@ ${formattedSteps}
   }
 
   private async resolveMentions(text: string): Promise<{ resolved: string; mentions: ResolvedMention[] }> {
-    let resolved = text;
-    const mentions: ResolvedMention[] = [];
-
-    // Find all @ mentions: @{selection}, @{content}, @filepath
-    const mentionRegex = /@(\{selection\}|\{content\}|[^\s@]+)/g;
-    const matches = [...text.matchAll(mentionRegex)];
-
-    for (const match of matches) {
-      const mention = match[1];
-      let replacement = match[0]; // Keep original if resolution fails
-      let content: string | null = null;
-
-      if (mention === "{selection}") {
-        // Get selected text from editor
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (editor && editor.somethingSelected()) {
-          content = editor.getSelection();
-          replacement = `[Selected text]\n${content}\n[/Selected text]`;
-        }
-      } else if (mention === "{content}") {
-        // Get content of active note
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile) {
-          const rawContent = await this.app.vault.read(activeFile);
-          content = this.stripFrontmatter(rawContent);
-          replacement = `[Content of ${activeFile.path}]\n${content}\n[/Content]`;
-        }
-      } else {
-        // It's a file path - try to read the file
-        const file = this.app.vault.getAbstractFileByPath(mention);
-        if (file instanceof TFile) {
-          try {
-            const rawContent = await this.app.vault.read(file);
-            content = this.stripFrontmatter(rawContent);
-            replacement = `[Content of ${mention}]\n${content}\n[/Content]`;
-          } catch {
-            // Keep original mention if file can't be read
-          }
-        }
-      }
-
-      if (content !== null) {
-        mentions.push({ original: match[0], content });
-      }
-
-      resolved = resolved.replace(match[0], replacement);
+    interface Occurrence extends MentionOccurrence {
+      original: string;
+      replacement: string;
+      content: string;
     }
+    const occurrences: Occurrence[] = [];
+
+    // --- @{selection}: lift the editor selection into the prompt.
+    const editor = this.app.workspace.activeEditor?.editor;
+    if (editor && editor.somethingSelected()) {
+      const content = editor.getSelection();
+      const replacement = `[Selected text]\n${content}\n[/Selected text]`;
+      for (const occ of findLiteralOccurrences(text, "@{selection}")) {
+        occurrences.push({ ...occ, original: occ.matched, replacement, content });
+      }
+    }
+
+    // --- @{content}: lift the active file's body into the prompt.
+    const activeFile = this.app.workspace.getActiveFile();
+    if (activeFile) {
+      try {
+        const rawContent = await this.app.vault.read(activeFile);
+        const content = this.stripFrontmatter(rawContent);
+        const replacement = `[Content of ${activeFile.path}]\n${content}\n[/Content]`;
+        for (const occ of findLiteralOccurrences(text, "@{content}")) {
+          occurrences.push({ ...occ, original: occ.matched, replacement, content });
+        }
+      } catch {
+        // Leave the token as-is if the active file can't be read.
+      }
+    }
+
+    // --- @path: scan the vault, longest path first, so file names with
+    // spaces/unicode/regex-special chars resolve correctly and longer paths
+    // take priority over shorter suffixes. Uses `getFiles()` (not
+    // `getMarkdownFiles()`) so workflow-side mentions can reference any vault
+    // file — `@workflows/foo.yaml`, `@config.json`, `@diagram.canvas`, etc.,
+    // matching the pre-refactor behaviour which did a raw
+    // `getAbstractFileByPath(token)` lookup.
+    const files = this.app.vault.getFiles();
+    const filePaths = files.map(f => f.path);
+    const fileByPath = new Map<string, TFile>(files.map(f => [f.path, f]));
+    const fileMatches = findFileMentionOccurrences(text, filePaths, { prefix: "@" });
+    // Group hits by file so we only read each file once, regardless of how
+    // many times it was mentioned.
+    const hitsByPath = new Map<string, MentionOccurrence[]>();
+    for (const m of fileMatches) {
+      // Drop hits that collide with an already-recorded selection/content
+      // occurrence (extremely rare — would require a vault file literally
+      // named `{selection}.md` or similar).
+      if (occurrences.some(o => !(m.end <= o.start || m.start >= o.end))) continue;
+      const list = hitsByPath.get(m.key) ?? [];
+      list.push(m);
+      hitsByPath.set(m.key, list);
+    }
+    for (const [path, hits] of hitsByPath) {
+      const file = fileByPath.get(path);
+      if (!file) continue;
+      try {
+        const rawContent = await this.app.vault.read(file);
+        const content = this.stripFrontmatter(rawContent);
+        const replacement = `[Content of ${path}]\n${content}\n[/Content]`;
+        for (const h of hits) {
+          occurrences.push({ ...h, original: h.matched, replacement, content });
+        }
+      } catch {
+        // Leave the token as-is if the file can't be read.
+      }
+    }
+
+    // Splice in reverse order so earlier offsets stay valid as we rewrite.
+    const spliced = occurrences.slice().sort((a, b) => b.start - a.start);
+    let resolved = text;
+    for (const o of spliced) {
+      resolved = resolved.slice(0, o.start) + o.replacement + resolved.slice(o.end);
+    }
+
+    // Return mentions in text-order so downstream consumers see them in the
+    // same order the user typed them.
+    const mentions: ResolvedMention[] = occurrences
+      .slice()
+      .sort((a, b) => a.start - b.start)
+      .map(o => ({ original: o.original, content: o.content }));
 
     return { resolved, mentions };
   }

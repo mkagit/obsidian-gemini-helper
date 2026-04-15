@@ -68,8 +68,10 @@ import {
 } from "src/core/crypto";
 import { cryptoCache } from "src/core/cryptoCache";
 import { formatError } from "src/utils/error";
+import { findFileMentionOccurrences } from "src/utils/mentionResolver";
 import { discoverSkills, loadSkill, buildSkillSystemPrompt, collectSkillWorkflows, type SkillMetadata, type LoadedSkill, type SkillWorkflowRef } from "src/core/skillsLoader";
-import { DEFAULT_BUILTIN_SKILL_IDS, builtinFolderPath, getBuiltinSkillMetadata } from "src/core/builtinSkills";
+import { GET_WORKFLOW_SPEC_TOOL, GET_WORKFLOW_SPEC_TOOL_NAME, handleGetWorkflowSpec } from "src/workflow/workflowSpec";
+import { DEFAULT_BUILTIN_SKILL_IDS, builtinFolderPath, getBuiltinSkillMetadata, isBuiltinSkillPath } from "src/core/builtinSkills";
 import { parseWorkflowFromMarkdown } from "src/workflow/parser";
 import { WorkflowExecutor } from "src/workflow/executor";
 import { WorkflowExecutionModal } from "./workflow/WorkflowExecutionModal";
@@ -817,29 +819,50 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 		return result;
 	};
 
-	// Resolve message variables (for regular messages)
+	// Resolve message variables (for regular messages).
+	// Bare file paths that match a vault markdown file get their contents
+	// inlined. The scan iterates the vault list longest-path-first so files
+	// with spaces/unicode/regex-special chars resolve correctly and longer
+	// paths take priority over shorter suffixes. Paths must be surrounded by
+	// whitespace so we don't accidentally replace text inside words.
 	const resolveMessageVariables = async (content: string): Promise<string> => {
-		let result = content;
+		let result = await resolveCommandVariables(content);
 
-		// Resolve {selection} and {content} using the same logic as slash commands
-		result = await resolveCommandVariables(result);
+		const files = plugin.app.vault.getMarkdownFiles();
+		const fileByPath = new Map<string, TFile>(files.map(f => [f.path, f]));
+		const occurrences = findFileMentionOccurrences(
+			result,
+			files.map(f => f.path),
+			{ requireWhitespaceBoundary: true }
+		);
+		if (occurrences.length === 0) return result;
 
-		// Resolve file paths - read file content and insert it
-		const filePathPattern = /(?:^|\s)([\w/-]+\.md)(?:\s|$)/g;
-		const matches = [...result.matchAll(filePathPattern)];
-
-		for (const match of matches) {
-			const filePath = match[1];
-			const file = plugin.app.vault.getAbstractFileByPath(filePath);
-			if (file instanceof TFile) {
-				try {
-					const fileContent = await plugin.app.vault.read(file);
-					const replacement = `\n\n--- Content of "${filePath}" ---\n${fileContent}\n--- End of "${filePath}" ---\n\n`;
-					result = result.replace(filePath, replacement);
-				} catch {
-					// File couldn't be read, leave as-is
+		interface Splice { start: number; end: number; replacement: string; }
+		const splices: Splice[] = [];
+		const hitsByPath = new Map<string, typeof occurrences>();
+		for (const occ of occurrences) {
+			const list = hitsByPath.get(occ.key) ?? [];
+			list.push(occ);
+			hitsByPath.set(occ.key, list);
+		}
+		for (const [path, hits] of hitsByPath) {
+			const file = fileByPath.get(path);
+			if (!file) continue;
+			try {
+				const fileContent = await plugin.app.vault.read(file);
+				const replacement = `\n\n--- Content of "${path}" ---\n${fileContent}\n--- End of "${path}" ---\n\n`;
+				for (const h of hits) {
+					splices.push({ start: h.start, end: h.end, replacement });
 				}
+			} catch {
+				// File couldn't be read — leave the mention as-is.
 			}
+		}
+
+		// Splice in reverse order so earlier offsets stay valid.
+		splices.sort((a, b) => b.start - a.start);
+		for (const s of splices) {
+			result = result.slice(0, s.start) + s.replacement + result.slice(s.end);
 		}
 
 		return result;
@@ -1109,14 +1132,14 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					setActiveSkillPaths(effectiveSkillPaths);
 				}
 
-				// Load active skills (needed for both workflow tools and system prompt)
+				// Load active skills (needed for both workflow tools and system prompt).
+				// Vault skills are returned in lazy form (empty instructions/references);
+				// the chat LLM fetches SKILL.md via the read_note tool when it needs it.
 				let loadedSkillsList: LoadedSkill[] = [];
 				if (effectiveSkillPaths.length > 0) {
 					const activeMetadata = availableSkills.filter(s => effectiveSkillPaths.includes(s.folderPath));
 					if (activeMetadata.length > 0) {
-						loadedSkillsList = await Promise.all(
-							activeMetadata.map(m => loadSkill(plugin.app, m))
-						);
+						loadedSkillsList = activeMetadata.map(m => loadSkill(plugin.app, m));
 					}
 				}
 
@@ -1152,6 +1175,12 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					"bulk_propose_edit", "bulk_propose_rename", "bulk_propose_delete"
 				];
 				const searchToolNames = ["search_notes", "list_notes"];
+				// Vault skills are loaded lazily — their SKILL.md (workflow IDs,
+				// inputVariables, full instructions) is only reachable via read_note.
+				// If any such skill is active we must keep read_note available even
+				// when vaultToolMode would otherwise strip it, or the model gets
+				// neither inline workflow metadata nor the tool to fetch it.
+				const hasActiveVaultSkill = loadedSkillsList.some(s => !isBuiltinSkillPath(s.folderPath));
 				const tools = allTools.filter(tool => {
 					// MCP tools are always included
 					if (isMcpTool(tool)) {
@@ -1159,6 +1188,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 					}
 					// Filter Obsidian tools based on mode
 					if (vaultToolMode === "none") {
+						if (tool.name === "read_note" && hasActiveVaultSkill) return true;
 						return !vaultToolNames.includes(tool.name);
 					}
 					if (vaultToolMode === "noSearch") {
@@ -1175,6 +1205,7 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 				// Add execute_javascript tool
 				if (toolsEnabled) {
 					tools.push(EXECUTE_JAVASCRIPT_TOOL);
+					tools.push(GET_WORKFLOW_SPEC_TOOL);
 				}
 
 				// Create context for RAG tools (Obsidian tools only)
@@ -1232,6 +1263,10 @@ const Chat = forwardRef<ChatRef, ChatProps>(({ plugin }, ref) => {
 						// JavaScript sandbox tool
 						if (name === "execute_javascript") {
 							return await handleExecuteJavascriptTool(args);
+						}
+						// Workflow spec lookup tool
+						if (name === GET_WORKFLOW_SPEC_TOOL_NAME) {
+							return handleGetWorkflowSpec(args, plugin);
 						}
 						// Otherwise use Obsidian tool executor
 						if (obsidianToolExecutor) {
@@ -2131,7 +2166,8 @@ async function executeSkillWorkflow(
 		return { error: `Unknown workflow ID: ${workflowId}. Available: ${available}` };
 	}
 
-	const { workflowRef, vaultPath } = entry;
+	const { vaultPath } = entry;
+	const workflowDisplayName = vaultPath.substring(vaultPath.lastIndexOf("/") + 1).replace(/\.md$/, "") || workflowId;
 
 	// Read workflow file
 	const file = plugin.app.vault.getAbstractFileByPath(vaultPath);
@@ -2144,7 +2180,7 @@ async function executeSkillWorkflow(
 	// Parse workflow
 	let workflow;
 	try {
-		workflow = parseWorkflowFromMarkdown(content, workflowRef.name);
+		workflow = parseWorkflowFromMarkdown(content);
 	} catch (e) {
 		return { error: `Failed to parse workflow: ${e instanceof Error ? e.message : String(e)}`, workflowId, workflowPath: vaultPath };
 	}
@@ -2167,7 +2203,7 @@ async function executeSkillWorkflow(
 	const abortController = new AbortController();
 
 	const modal = new WorkflowExecutionModal(
-		plugin.app, workflow, workflowRef.name || workflowId, abortController, () => {},
+		plugin.app, workflow, workflowDisplayName, abortController, () => {},
 	);
 	modal.open();
 
@@ -2214,7 +2250,7 @@ async function executeSkillWorkflow(
 			(log) => executionModalRef?.updateFromLog(log),
 			{
 				workflowPath: vaultPath,
-				workflowName: workflowRef.name,
+				workflowName: workflowDisplayName,
 				recordHistory: true,
 				abortSignal: abortController.signal,
 			},
